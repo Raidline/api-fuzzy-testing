@@ -11,6 +11,11 @@ This tool allows you to perform comprehensive fuzzy testing on any API by simply
 Swagger/OpenAPI). Point it to your API server, and the tool will systematically test all endpoints with various payloads
 to identify failures and unexpected responses.
 
+Why Java? Because i wanted a project where i could learn/investigate the virtualThreads usage in Java. That is why.
+Is the Java the best language for CLI? No. But i wanted to do this project and since i want to investigate virtualThreads in Java, you get CLI app in Java. BIG W!
+
+> **Note:** If everything goes well, i will probably re-do this in a more nice language for CLI (e.g Go)
+
 ### How It Works
 
 1. **Provide an API Schema** – Supply a Swagger/OpenAPI YAML definition file describing your API endpoints
