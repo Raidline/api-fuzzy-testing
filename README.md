@@ -1,7 +1,9 @@
 # API Fuzzy Testing Tool
 
-A powerful fuzzy testing tool designed to automatically test API endpoints by generating and sending randomized or
+A powerful command-line fuzzy testing tool designed to automatically test API endpoints by generating and sending randomized or
 malformed requests to uncover potential vulnerabilities, edge cases, and unexpected behaviors.
+
+> **Note:** This tool is designed to run exclusively via CLI. GUI support is not planned at this time.
 
 ## Overview
 
