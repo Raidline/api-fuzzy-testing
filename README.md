@@ -4,6 +4,7 @@ A powerful command-line fuzzy testing tool designed to automatically test API en
 malformed requests to uncover potential vulnerabilities, edge cases, and unexpected behaviors.
 
 > **Note:** This tool is designed to run exclusively via CLI. GUI support is not planned at this time.
+> **Note:** Only supporting localhost for now.
 
 ## Overview
 

@@ -13,6 +13,6 @@ public class ApiFuzzyMain {
 
         var def = new OpenAPIParser().parse(arguments.file.value());
 
-        CLILogger.info("API Definition : %s", def.toString());
+        //CLILogger.info("API Definition : %s", def.toString());
     }
 }
