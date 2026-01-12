@@ -10,9 +10,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Suppress sun.misc.Unsafe warnings from Maven's Guice dependency
+export MAVEN_OPTS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.misc=ALL-UNNAMED -Xmx512m"
+
 echo "Building project..."
-mvn clean compile -q
+mvn clean compile -q 2>/dev/null
 
 echo "Running API Fuzzy Testing Tool..."
-mvn exec:java -Dexec.mainClass="ApiFuzzyMain" -Dexec.args="$*" -q
+java -cp "target/classes:target/dependency/*" pt.raidline.api.fuzzy.ApiFuzzyMain "$@"
 
