@@ -4,7 +4,9 @@ import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -49,14 +51,27 @@ class ComponentBuilder {
         public String buildBody() {
             //CLILogger.debug("Building for schema : [%s]", schema);
             if (isArray(schema)) {
+                int outerArraySize = 5;
                 CLILogger.debug("Building an array");
+                var body = new StringBuilder();
+                ApiDefinition.Schema arrayItem = schema.items();
+                precondition("Schema Validation", "Property [%s] array type must contain [items]"
+                        .formatted(key), () -> arrayItem != null);
 
-                //deal with this later
+                if (arrayItem.$ref() != null) {
+                    CLILogger.warn("We have a cross-reference inside the array, skip for now : [%s]",
+                            arrayItem.$ref());
+                } else {
+                    buildSimpleArrayValues(outerArraySize, body, arrayItem);
+                }
+                return body.toString();
+            } else {
+                return buildObjectValues(schema);
             }
+        }
 
-            // the body does not need to well-formed
-            var body = new StringBuilder("{\n");
-
+        private static String buildObjectValues(ApiDefinition.Schema schema) {
+            StringBuilder innerObj = new StringBuilder("{\n");
             for (var entry : schema.properties().entrySet()) {
                 ApiDefinition.Schema value = entry.getValue();
 
@@ -76,28 +91,32 @@ class ComponentBuilder {
                                 arrayItem.$ref());
                     } else {
                         int size = 5;
-                        appendProperty(entry.getKey(), body);
-                        body.append("[");
-                        for (int i = 0; i < size; i++) {
-                            body.append(buildValue(arrayItem));
-
-                            if (i != size - 1) {
-                                body.append(",");
-                            }
-                        }
-                        body.append("]");
+                        appendProperty(entry.getKey(), innerObj);
+                        buildSimpleArrayValues(size, innerObj, arrayItem);
                     }
                 } else {
-                    appendProperty(entry.getKey(), body);
-                    body.append(buildValue(value)); //{value}
+                    appendProperty(entry.getKey(), innerObj);
+                    innerObj.append(buildValue(value)); //{value}
                 }
 
-                body.append(",").append("\n");
+                innerObj.append(",").append("\n");
             }
-            body.deleteCharAt(body.length() - 2); //remove last ","
+            innerObj.deleteCharAt(innerObj.length() - 2); //remove last ","
 
+            return innerObj.append("}").toString();
+        }
 
-            return body.append("}").toString();
+        private static void buildSimpleArrayValues(int outerArraySize, StringBuilder body,
+                                                   ApiDefinition.Schema arrayItem) {
+            body.append("[");
+            for (int i = 0; i < outerArraySize; i++) {
+                body.append(buildValue(arrayItem));
+
+                if (i != outerArraySize - 1) {
+                    body.append(",");
+                }
+            }
+            body.append("]");
         }
 
         private static void appendProperty(String key,
@@ -105,18 +124,33 @@ class ComponentBuilder {
             body.append("\"").append(key).append("\":"); // "id:"
         }
 
-        private boolean isArray(ApiDefinition.Schema schema) {
+        private static boolean isArray(ApiDefinition.Schema schema) {
             return "array".equalsIgnoreCase(schema.type());
         }
 
 
-        private Object buildValue(ApiDefinition.Schema schema) {
+        private static Object buildValue(ApiDefinition.Schema schema) {
             if ("integer".equalsIgnoreCase(schema.type())) {
                 return 1;
             }
 
             if ("date-time".equalsIgnoreCase(schema.format())) {
                 return LocalDateTime.now().toString();
+            }
+
+            if ("array".equalsIgnoreCase(schema.type())) {
+                List<Object> values = new ArrayList<>();
+                int size = 5;
+
+                for (int i = 0; i < size; i++) {
+                    values.add(buildValue(schema.items()));
+                }
+
+                return values;
+            }
+
+            if ("object".equalsIgnoreCase(schema.type())) {
+                return buildObjectValues(schema);
             }
 
             return "some string";
