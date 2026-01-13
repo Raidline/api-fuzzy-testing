@@ -76,45 +76,6 @@ public final class AssertionUtils {
         return new ErrorAggregation(key);
     }
 
-    public interface ErrorsAggregator {
-        ErrorsAggregator onError(String message, BooleanSupplier condition);
-
-        void complete();
-    }
-
-    private static class ErrorAggregation implements ErrorsAggregator {
-        private final List<String> errors = new ArrayList<>(4); // 4 as the best effort
-        private final String key;
-
-        private ErrorAggregation(String key) {
-            this.key = key;
-        }
-
-        @Override
-        public ErrorsAggregator onError(String message, BooleanSupplier condition) {
-            Objects.requireNonNull(message);
-            Objects.requireNonNull(condition);
-
-            if (condition.getAsBoolean()) {
-                errors.add("Precondition [%s] failed. Reason: [%s]"
-                        .formatted(key, message));
-            }
-
-            return this;
-        }
-
-        @Override
-        public void complete() {
-            for (String error : this.errors) {
-                CLILogger.warn(
-                        "Precondition [%s] failed. Reason: [%s]",
-                        key,
-                        error
-                );
-            }
-        }
-    }
-
     private static void writeToFile(String logType, String logMessage) {
         try {
             if (!DEBUG_FILE.exists()) {
@@ -198,5 +159,44 @@ public final class AssertionUtils {
                                         f.getLineNumber()
                 )
                 .forEach(f -> CLILogger.severe("%s", f));
+    }
+
+    public interface ErrorsAggregator {
+        ErrorsAggregator onError(String message, BooleanSupplier condition);
+
+        void complete();
+    }
+
+    private static class ErrorAggregation implements ErrorsAggregator {
+        private final List<String> errors = new ArrayList<>(4); // 4 as the best effort
+        private final String key;
+
+        private ErrorAggregation(String key) {
+            this.key = key;
+        }
+
+        @Override
+        public ErrorsAggregator onError(String message, BooleanSupplier condition) {
+            Objects.requireNonNull(message);
+            Objects.requireNonNull(condition);
+
+            if (!condition.getAsBoolean()) {
+                errors.add("Precondition [%s] failed. Reason: [%s]"
+                        .formatted(key, message));
+            }
+
+            return this;
+        }
+
+        @Override
+        public void complete() {
+            for (String error : this.errors) {
+                CLILogger.warn(
+                        "Precondition [%s] failed. Reason: [%s]",
+                        key,
+                        error
+                );
+            }
+        }
     }
 }

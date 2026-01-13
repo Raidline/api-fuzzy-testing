@@ -38,12 +38,12 @@ public final class ArgumentParser {
 
         aggregateErrors("Parse Arguments")
                 .onError("You need to pass the file for parsing : [-f]",
-                        () -> paramIsMissing(args, "-f"))
+                        () -> paramExists(args, "-f"))
                 .onError("You need to pass the server location : [-s]",
-                        () -> paramIsMissing(args, "-s"))
+                        () -> paramExists(args, "-s"))
                 .onError("You have more params than what is supported : [%s]".formatted(
                                 args.length),
-                        () -> args.length != MANDATORY_PARAMS.size() + NON_MANDATORY_PARAMS.size())
+                        () -> args.length == MANDATORY_PARAMS.size() + NON_MANDATORY_PARAMS.size())
                 .complete();
 
         var argBuilder = AppArguments.toBuilder();
@@ -60,8 +60,8 @@ public final class ArgumentParser {
         return argBuilder.build();
     }
 
-    private static boolean paramIsMissing(String[] args, String param) {
-        return Arrays.stream(args).noneMatch(s -> s.split("=")[0].equals(param));
+    private static boolean paramExists(String[] args, String param) {
+        return Arrays.stream(args).anyMatch(s -> s.split("=")[0].equals(param));
     }
 
     private interface ArgParser {
@@ -134,7 +134,7 @@ public final class ArgumentParser {
 
             aggregator.onError(
                     "URL [%s] does not contain a valid host".formatted(url),
-                    () -> !host[0].contains(":")
+                    () -> host[0].contains(":")
             );
         }
 
@@ -156,9 +156,9 @@ public final class ArgumentParser {
             var trailScheme = url.substring(schemeEndIndex, schemeEndIndex + 3); // ->://
 
             aggregator.onError("URL [%s] does not have a valid scheme".formatted(url),
-                            () -> !scheme.contains("http"))
+                            () -> scheme.contains("http"))
                     .onError("URL [%s] does not have a valid scheme".formatted(url),
-                            () -> !trailScheme.equals("://"));
+                            () -> trailScheme.equals("://"));
 
             return outIndex;
         }

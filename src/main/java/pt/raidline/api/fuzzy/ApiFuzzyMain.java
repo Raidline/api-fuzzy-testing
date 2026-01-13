@@ -2,6 +2,7 @@ package pt.raidline.api.fuzzy;
 
 import pt.raidline.api.fuzzy.parser.args.ArgumentParser;
 import pt.raidline.api.fuzzy.parser.file.OpenAPIParser;
+import pt.raidline.api.fuzzy.runner.FuzzyTestProcessor;
 
 public class ApiFuzzyMain {
 
@@ -10,6 +11,8 @@ public class ApiFuzzyMain {
 
         var def = new OpenAPIParser().parse(arguments.file.value());
 
-        //CLILogger.info("API Definition : %s", def.toString());
+        new FuzzyTestProcessor(def).process();
+
+        //CLILogger.debug("API Definition : %s", def.toString());
     }
 }
