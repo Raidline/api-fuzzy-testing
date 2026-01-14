@@ -1,5 +1,9 @@
 package pt.raidline.api.fuzzy.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -105,7 +109,7 @@ public record ApiDefinition(
      * Represents a schema definition.
      */
     public record Schema(
-            String type,
+            SchemaType type,
             String format,
             String pattern,
             String $ref,
@@ -115,6 +119,7 @@ public record ApiDefinition(
             Map<String, Schema> properties,
             Schema items,
             Schema additionalProperties,
+            @JsonProperty("enum")
             List<String> enumValues, // "enum" in JSON, renamed to avoid Java keyword
             Integer minimum,
             Integer maximum,
@@ -132,5 +137,34 @@ public record ApiDefinition(
      * Represents the components section containing reusable schemas.
      */
     public record Components(Map<String, Schema> schemas) {
+    }
+
+    public enum SchemaType {
+        STRING, INTEGER, ARRAY, OBJECT;
+
+        @JsonCreator
+        public static SchemaType fromString(String type) {
+            return Arrays.stream(values())
+                    .filter(t -> t.name().toLowerCase().equalsIgnoreCase(type))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Argument [%s] is not recognizable"
+                            .formatted(type)));
+        }
+
+        public boolean isString() {
+            return this == STRING;
+        }
+
+        public boolean isInteger() {
+            return this == INTEGER;
+        }
+
+        public boolean isArray() {
+            return this == ARRAY;
+        }
+
+        public boolean isObject() {
+            return this == OBJECT;
+        }
     }
 }
