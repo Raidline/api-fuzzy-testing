@@ -11,7 +11,7 @@ public class ApiFuzzyMain {
 
         var def = new OpenAPIParser().parse(arguments.file.value());
 
-        new FuzzyTestProcessor(def).process();
+        new FuzzyTestProcessor().process(def);
 
         //CLILogger.debug("API Definition : %s", def.toString());
     }
