@@ -18,7 +18,7 @@ public class SchemaProcessor {
     private ComponentGraphNode processSchemaProp(String key, ApiDefinition.Schema currSchema,
                                                  Map<String, ApiDefinition.Schema> schemaDefinition) {
         Objects.requireNonNull(key);
-        Objects.requireNonNull(currSchema);
+        Objects.requireNonNull(currSchema, "Schema is null for key [%s]".formatted(key));
         Objects.requireNonNull(schemaDefinition);
 
         if (componentGraphNodes.containsKey(key)) {
@@ -27,19 +27,19 @@ public class SchemaProcessor {
 
         ComponentGraphNode node = new ComponentGraphNode(key);
 
-        if (currSchema.type().isObject() || currSchema.type().isArray()) {
-            node.builder = ComponentBuilder.preBuild(key, currSchema);
-        }
+        node.builder = ComponentBuilder.preBuild(key, currSchema);
 
-        for (var value : currSchema.properties().values()) {
-            ifReferenceProperty(value, schema -> {
-                var normalizedSchemaKey = trimSchemaKeyFromRef(schema.$ref());
-                ComponentGraphNode graphNode = processSchemaProp(normalizedSchemaKey,
-                        schemaDefinition.get(normalizedSchemaKey), schemaDefinition);
-                if (graphNode != null) {
-                    node.connections.put(normalizedSchemaKey, graphNode);
-                }
-            });
+        if (currSchema.properties() != null) {
+            for (var value : currSchema.properties().values()) {
+                ifReferenceProperty(value, schema -> {
+                    var normalizedSchemaKey = trimSchemaKeyFromRef(schema.$ref());
+                    ComponentGraphNode graphNode = processSchemaProp(normalizedSchemaKey,
+                            schemaDefinition.get(normalizedSchemaKey), schemaDefinition);
+                    if (graphNode != null) {
+                        node.connections.put(normalizedSchemaKey, graphNode);
+                    }
+                });
+            }
         }
 
         componentGraphNodes.put(key, node);

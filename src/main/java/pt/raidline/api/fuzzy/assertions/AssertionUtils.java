@@ -55,14 +55,20 @@ public final class AssertionUtils {
     }
 
     public static void internalAssertion(String key, BooleanSupplier action) {
+        internalAssertion(key, action, "Some error has occurred");
+    }
+
+    public static void internalAssertion(String key, BooleanSupplier action, String message) {
         if (!action.getAsBoolean()) {
             String logMessage = String.format(
-                    "There has been an error for the operation: %s",
-                    key
+                    "There has been an error for the operation: %s : %s",
+                    key,
+                    message
             );
             CLILogger.severe(
-                    "There has been an error for the operation: %s",
-                    key
+                    "There has been an error for the operation: %s : %s",
+                    key,
+                    message
             );
 
             writeToFile("ASSERTION FAILURE", logMessage);

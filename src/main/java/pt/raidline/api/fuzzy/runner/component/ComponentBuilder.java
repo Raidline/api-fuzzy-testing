@@ -2,10 +2,14 @@ package pt.raidline.api.fuzzy.runner.component;
 
 import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
+import pt.raidline.api.fuzzy.model.ApiDefinition.Schema;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -15,7 +19,7 @@ import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 public final class ComponentBuilder {
 
     public static SchemaBuilder preBuild(String key,
-                                         ApiDefinition.Schema schema) {
+                                         Schema schema) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(schema);
 
@@ -26,52 +30,85 @@ public final class ComponentBuilder {
         };
     }
 
-    record SchemaObjectBuilder(String key, ApiDefinition.Schema schema) implements SchemaBuilder {
+    record SchemaObjectBuilder(String key, Schema schema) implements SchemaBuilder {
 
         @Override
         public String buildBody(UnaryOperator<String> onRef) {
             AssertionUtils.internalAssertion("Properties on Schema",
-                    () -> schema.properties() != null && !schema.properties().isEmpty());
-            StringBuilder innerObj = new StringBuilder("{\n");
+                    () -> schema.properties() != null || schema.additionalProperties() != null,
+                    "For key : [%s] the schema properties and additionalProperties are null".formatted(key));
+            StringBuilder obj = new StringBuilder("{\n");
+
+            if (schema.additionalProperties() != null) { //this is a map
+                //key are always string
+                var props = schema.additionalProperties();
+
+                if (props.properties() != null) {
+                    //this means its a Map<String,Object>
+                    buildObjectInternal(obj, props, onRef);
+                } else {
+                    //this means its a Map<String,primitive>
+                    buildMap(obj, props, onRef);
+                }
+            } else {
+                buildObjectInternal(obj, schema, onRef);
+            }
+            obj.deleteCharAt(obj.length() - 2); //remove last ","
+
+            return obj.append("}").toString();
+        }
+
+        private void buildObjectInternal(StringBuilder obj, Schema schema, UnaryOperator<String> onRef) {
             for (var entry : schema.properties().entrySet()) {
-                ApiDefinition.Schema value = entry.getValue();
-                appendProperty(entry.getKey(), innerObj);
+                Schema value = entry.getValue();
+                appendProperty(entry.getKey(), obj);
 
                 if (value.$ref() != null) {
                     var key = trimSchemaKeyFromRef(value.$ref());
-                    innerObj.append(onRef.apply(key));
+                    obj.append(onRef.apply(key));
                 } else if (value.type().isArray()) {
                     int size = 5;
-                    ApiDefinition.Schema arrayItem = value.items();
+                    Schema arrayItem = value.items();
                     precondition("Schema Validation", "Property [%s] array type must contain [items]"
                             .formatted(entry.getKey()), () -> arrayItem != null);
 
                     if (arrayItem.$ref() != null) {
                         String k = trimSchemaKeyFromRef(arrayItem.$ref());
-                        buildArrayValues(size, innerObj, () -> onRef.apply(k));
+                        buildArrayValues(size, obj, () -> onRef.apply(k));
                     } else {
-                        buildArrayValues(size, innerObj, () ->
+                        buildArrayValues(size, obj, () ->
                                 buildValue(entry.getKey(), arrayItem, onRef));
                     }
                 } else {
-                    innerObj.append(buildValue(entry.getKey(), value, onRef)); //{value}
+                    obj.append(buildValue(entry.getKey(), value, onRef)); //{value}
                 }
 
-                innerObj.append(",").append("\n");
+                obj.append(",").append("\n");
             }
-            innerObj.deleteCharAt(innerObj.length() - 2); //remove last ","
+        }
 
-            return innerObj.append("}").toString();
+
+        private void buildMap(StringBuilder body, Schema schema, UnaryOperator<String> onRef) {
+            int mapSize = 5;
+            String keyPrefix = "key";
+
+            for (int i = 0; i < mapSize; i++) {
+                var key = keyPrefix + i;
+
+                appendProperty(key, body); //"keyx" :
+                body.append(buildValue(key, schema, onRef)).append(",");
+            }
+            body.append("\n");
         }
     }
 
-    record SchemaArrayBuilder(String key, ApiDefinition.Schema schema) implements SchemaBuilder {
+    record SchemaArrayBuilder(String key, Schema schema) implements SchemaBuilder {
 
         @Override
         public String buildBody(UnaryOperator<String> onRef) {
             var body = new StringBuilder();
             int outerArraySize = 5;
-            ApiDefinition.Schema arrayItem = schema.items();
+            Schema arrayItem = schema.items();
             precondition("Schema Validation", "Property [%s] array type must contain [items]"
                     .formatted(key), () -> arrayItem != null);
 
@@ -87,7 +124,7 @@ public final class ComponentBuilder {
         }
     }
 
-    record SchemaSingleBuilder(String key, ApiDefinition.Schema schema) implements SchemaBuilder {
+    record SchemaSingleBuilder(String key, Schema schema) implements SchemaBuilder {
 
         @Override
         public String buildBody(UnaryOperator<String> onRef) {
@@ -125,15 +162,17 @@ public final class ComponentBuilder {
 
 
     //todo: apply random shit logic here
-    static Object buildValue(String key, ApiDefinition.Schema schema, UnaryOperator<String> onRef) {
+    static Object buildValue(String key, Schema schema, UnaryOperator<String> onRef) {
         return switch (schema.type()) {
             case INTEGER -> 1;
             case STRING -> {
                 if ("date-time".equalsIgnoreCase(schema.format())) {
                     yield LocalDateTime.now().toString();
+                } else if ("date".equalsIgnoreCase(schema.format())) {
+                    yield Date.from(Instant.now()).toString();
                 }
 
-                yield "some string";
+                yield "\"some string\"";
             }
             case ARRAY -> {
                 List<Object> values = new ArrayList<>();
