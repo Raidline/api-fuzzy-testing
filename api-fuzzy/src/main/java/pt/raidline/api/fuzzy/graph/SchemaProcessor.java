@@ -1,15 +1,15 @@
-package pt.raidline.api.fuzzy.runner.graph;
+package pt.raidline.api.fuzzy.graph;
 
+import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
-import pt.raidline.api.fuzzy.runner.component.ComponentBuilder;
+import pt.raidline.api.fuzzy.component.ComponentBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import static pt.raidline.api.fuzzy.runner.component.ComponentBuilder.trimSchemaKeyFromRef;
+import static pt.raidline.api.fuzzy.component.ComponentBuilder.trimSchemaKeyFromRef;
 
 public class SchemaProcessor {
     public final Map<String, ComponentGraphNode> componentGraphNodes = new HashMap<>();
@@ -48,6 +48,7 @@ public class SchemaProcessor {
     }
 
     public void processSchemaNodeGraph(Map<String, ApiDefinition.Schema> schemaDefinition) {
+        AssertionUtils.internalAssertion("Schema definition", () -> schemaDefinition != null);
         for (var entry : schemaDefinition.entrySet()) {
             this.processSchemaProp(entry.getKey(), entry.getValue(), schemaDefinition);
         }

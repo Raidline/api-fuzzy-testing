@@ -1,7 +1,6 @@
-package pt.raidline.api.fuzzy.runner.component;
+package pt.raidline.api.fuzzy.component;
 
 import pt.raidline.api.fuzzy.assertions.AssertionUtils;
-import pt.raidline.api.fuzzy.model.ApiDefinition;
 import pt.raidline.api.fuzzy.model.ApiDefinition.Schema;
 
 import java.time.Instant;
@@ -9,9 +8,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;

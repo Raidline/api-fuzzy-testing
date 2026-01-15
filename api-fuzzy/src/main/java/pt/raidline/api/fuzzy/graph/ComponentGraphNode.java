@@ -1,6 +1,6 @@
-package pt.raidline.api.fuzzy.runner.graph;
+package pt.raidline.api.fuzzy.graph;
 
-import pt.raidline.api.fuzzy.runner.component.SchemaBuilder;
+import pt.raidline.api.fuzzy.component.SchemaBuilder;
 
 import java.util.HashMap;
 import java.util.Map;

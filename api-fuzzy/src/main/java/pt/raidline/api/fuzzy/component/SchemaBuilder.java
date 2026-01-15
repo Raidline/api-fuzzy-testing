@@ -1,4 +1,4 @@
-package pt.raidline.api.fuzzy.runner.component;
+package pt.raidline.api.fuzzy.component;
 
 import java.util.function.UnaryOperator;
 
