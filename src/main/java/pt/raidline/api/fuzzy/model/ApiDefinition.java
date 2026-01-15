@@ -140,7 +140,7 @@ public record ApiDefinition(
     }
 
     public enum SchemaType {
-        STRING, INTEGER, ARRAY, OBJECT;
+        STRING, INTEGER, ARRAY, OBJECT, BOOLEAN;
 
         @JsonCreator
         public static SchemaType fromString(String type) {
@@ -161,6 +161,10 @@ public record ApiDefinition(
 
         public boolean isArray() {
             return this == ARRAY;
+        }
+
+        public boolean isBoolean() {
+            return this == BOOLEAN;
         }
 
         public boolean isObject() {

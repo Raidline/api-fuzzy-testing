@@ -1,0 +1,13 @@
+
+════════════════════════════════════════════════════════════════════════════════
+║ [ASSERTION FAILURE] 2026-01-15 14:42:46.922
+────────────────────────────────────────────────────────────────────────────────
+║ MESSAGE:
+║   There has been an error for the operation: parse openapi file
+────────────────────────────────────────────────────────────────────────────────
+║ STACKTRACE:
+║   → pt.raidline.api.fuzzy.assertions.AssertionUtils#writeToFile (Line 103)
+║   → pt.raidline.api.fuzzy.assertions.AssertionUtils#internalAssertion (Line 68)
+║   → pt.raidline.api.fuzzy.parser.file.OpenAPIParser#parse (Line 38)
+║   → pt.raidline.api.fuzzy.ApiFuzzyMain#main (Line 13)
+════════════════════════════════════════════════════════════════════════════════
