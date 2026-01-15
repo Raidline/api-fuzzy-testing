@@ -36,22 +36,6 @@ public record ApiDefinition(
                            Operation post,
                            Operation put,
                            Operation delete) {
-
-        public HttpOperation getOperation() {
-            if (get != null) {
-                return HttpOperation.GET;
-            }
-
-            if (post != null) {
-                return HttpOperation.POST;
-            }
-
-            if (put != null) {
-                return HttpOperation.PUT;
-            }
-
-            return HttpOperation.DELETE;
-        }
     }
 
     /**

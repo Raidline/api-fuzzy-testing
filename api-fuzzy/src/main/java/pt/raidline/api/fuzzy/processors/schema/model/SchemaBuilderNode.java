@@ -1,17 +1,18 @@
-package pt.raidline.api.fuzzy.graph;
+package pt.raidline.api.fuzzy.processors.schema.model;
 
 import pt.raidline.api.fuzzy.component.SchemaBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class ComponentGraphNode {
+public class SchemaBuilderNode {
     private final String key;
-    public SchemaBuilder builder;
-    public final Map<String, ComponentGraphNode> connections = new HashMap<>();
+    public final SchemaBuilder builder;
+    public final Map<String, SchemaBuilderNode> connections = new HashMap<>();
 
-    public ComponentGraphNode(String key) {
+    public SchemaBuilderNode(String key, SchemaBuilder builder) {
         this.key = key;
+        this.builder = builder;
     }
 
     public String buildSchema() {
