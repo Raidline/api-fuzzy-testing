@@ -11,6 +11,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -45,10 +47,10 @@ public final class ComponentBuilder {
 
                 if (props.properties() != null) {
                     //this means its a Map<String,Object>
-                    buildObjectInternal(obj, props, onRef);
+                    buildMap(obj, _ -> buildObjectInternal(obj, props, onRef));
                 } else {
                     //this means its a Map<String,primitive>
-                    buildMap(obj, props, onRef);
+                    buildMap(obj, k -> obj.append(buildValue(k, props, onRef)).append(","));
                 }
             } else {
                 buildObjectInternal(obj, schema, onRef);
@@ -88,7 +90,7 @@ public final class ComponentBuilder {
         }
 
 
-        private void buildMap(StringBuilder body, Schema schema, UnaryOperator<String> onRef) {
+        private void buildMap(StringBuilder body, Consumer<String> appender) {
             int mapSize = 5;
             String keyPrefix = "key";
 
@@ -96,7 +98,8 @@ public final class ComponentBuilder {
                 var key = keyPrefix + i;
 
                 appendProperty(key, body); //"keyx" :
-                body.append(buildValue(key, schema, onRef)).append(",");
+                appender.accept(key);
+                //body.append(buildValue(key, schema, onRef)).append(",");
             }
             body.append("\n");
         }
