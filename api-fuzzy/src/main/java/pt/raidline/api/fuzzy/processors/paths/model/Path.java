@@ -1,6 +1,5 @@
 package pt.raidline.api.fuzzy.processors.paths.model;
 
-import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
 import pt.raidline.api.fuzzy.model.HttpOperation;
 
@@ -15,7 +14,7 @@ public record Path(String key, List<PathOperation> operations) {
 
     public record PathOperation(HttpOperation op,
                                 Map<ParameterLocation, List<PathParameter>> opParams,
-                                OperationExchange successResponse,
+                                Map<Integer, OperationExchange> successResponse,
                                 Map<Integer, OperationExchange> errorResponses,
                                 OperationExchange request) {
     }

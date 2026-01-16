@@ -9,7 +9,7 @@ public class ApiFuzzyMain {
         var arguments = ArgumentParser.parseArguments(args);
         var def = new OpenAPIParser().parse(arguments.file.value());
 
-        new FuzzyTestService().process(def);
+        new FuzzyTestService().process(def, arguments.server);
 
         //CLILogger.debug("API Definition : %s", def.toString());
     }

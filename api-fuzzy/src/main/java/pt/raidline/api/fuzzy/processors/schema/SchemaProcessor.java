@@ -14,11 +14,9 @@ import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 import static pt.raidline.api.fuzzy.component.ComponentBuilder.trimSchemaKeyFromRef;
 
 public class SchemaProcessor {
-    public final Map<String, SchemaBuilderNode> componentGraphNodes = new HashMap<>();
-
     // For now, if we see cycles we just don't calculate the JSON again
     private SchemaBuilderNode processSchemaProp(String key, ApiDefinition.Schema currSchema,
-                                                Map<String, ApiDefinition.Schema> schemaDefinition) {
+                                                Map<String, ApiDefinition.Schema> schemaDefinition, Map<String, SchemaBuilderNode> componentGraphNodes) {
         Objects.requireNonNull(key);
         Objects.requireNonNull(currSchema, "Schema is null for key [%s]".formatted(key));
         Objects.requireNonNull(schemaDefinition);
@@ -34,7 +32,7 @@ public class SchemaProcessor {
                 ifReferenceProperty(value, schema -> {
                     var normalizedSchemaKey = trimSchemaKeyFromRef(schema.$ref());
                     SchemaBuilderNode graphNode = processSchemaProp(normalizedSchemaKey,
-                            schemaDefinition.get(normalizedSchemaKey), schemaDefinition);
+                            schemaDefinition.get(normalizedSchemaKey), schemaDefinition, componentGraphNodes);
                     if (graphNode != null) {
                         node.connections.put(normalizedSchemaKey, graphNode);
                     }
@@ -47,7 +45,7 @@ public class SchemaProcessor {
         return node;
     }
 
-    public void processSchemaNodeGraph(ApiDefinition.Components components) {
+    public Map<String, SchemaBuilderNode> processSchemaNodeGraph(ApiDefinition.Components components) {
         precondition("Component key",
                 "In order to proceed, you need to define the components part of the schema",
                 () -> components != null);
@@ -59,10 +57,13 @@ public class SchemaProcessor {
         var schemaDefinition = components.schemas();
 
         AssertionUtils.internalAssertion("Schema definition", () -> schemaDefinition != null);
+        Map<String, SchemaBuilderNode> componentGraphNodes = new HashMap<>();
 
         for (var entry : schemaDefinition.entrySet()) {
-            this.processSchemaProp(entry.getKey(), entry.getValue(), schemaDefinition);
+            this.processSchemaProp(entry.getKey(), entry.getValue(), schemaDefinition, componentGraphNodes);
         }
+
+        return componentGraphNodes;
     }
 
     private void ifReferenceProperty(ApiDefinition.Schema value, Consumer<ApiDefinition.Schema> schema) {
