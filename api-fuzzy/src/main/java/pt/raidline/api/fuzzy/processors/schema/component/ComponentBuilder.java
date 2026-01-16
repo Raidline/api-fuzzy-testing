@@ -1,4 +1,4 @@
-package pt.raidline.api.fuzzy.component;
+package pt.raidline.api.fuzzy.processors.schema.component;
 
 import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.model.ApiDefinition.Schema;

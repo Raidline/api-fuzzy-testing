@@ -2,7 +2,7 @@ package pt.raidline.api.fuzzy.processors.schema;
 
 import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
-import pt.raidline.api.fuzzy.component.ComponentBuilder;
+import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
 import java.util.HashMap;
@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
-import static pt.raidline.api.fuzzy.component.ComponentBuilder.trimSchemaKeyFromRef;
+import static pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder.trimSchemaKeyFromRef;
 
 public class SchemaProcessor {
     // For now, if we see cycles we just don't calculate the JSON again

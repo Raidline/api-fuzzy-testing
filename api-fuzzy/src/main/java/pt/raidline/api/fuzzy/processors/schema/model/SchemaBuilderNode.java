@@ -1,6 +1,6 @@
 package pt.raidline.api.fuzzy.processors.schema.model;
 
-import pt.raidline.api.fuzzy.component.SchemaBuilder;
+import pt.raidline.api.fuzzy.processors.schema.component.SchemaBuilder;
 
 import java.util.HashMap;
 import java.util.Map;

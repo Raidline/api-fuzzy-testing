@@ -13,4 +13,12 @@ public enum HttpOperation {
     HttpOperation(Function<ApiDefinition.PathItem, ApiDefinition.Operation> fromItemToOp) {
         this.fromItemToOp = fromItemToOp;
     }
+
+    public boolean isGet() {
+        return this == GET;
+    }
+
+    public boolean isPost() {
+        return this == POST;
+    }
 }

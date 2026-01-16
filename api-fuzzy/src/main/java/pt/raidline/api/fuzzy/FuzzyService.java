@@ -8,12 +8,12 @@ import pt.raidline.api.fuzzy.processors.schema.SchemaProcessor;
 
 import java.util.Objects;
 
-class FuzzyTestService {
+class FuzzyService {
     private final SchemaProcessor schemaProcessor;
     private final PathProcessor pathProcessor;
     private final FuzzyClient client;
 
-    FuzzyTestService() {
+    FuzzyService() {
         this.pathProcessor = new PathProcessor();
         this.schemaProcessor = new SchemaProcessor();
         this.client = new FuzzyClient();
@@ -26,6 +26,6 @@ class FuzzyTestService {
         var schemaGraph = this.schemaProcessor.processSchemaNodeGraph(definition.components());
         //this.schemaProcessor.componentGraphNodes.forEach((k, v) -> CLILogger.info("Body for schema : [%s] -> %s", k, v));
         var paths = this.pathProcessor.processPaths(definition.paths());
-        this.client.executeRequest(schemaGraph, paths);
+        this.client.executeRequest(schemaGraph, paths, server);
     }
 }

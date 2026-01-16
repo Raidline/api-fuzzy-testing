@@ -1,4 +1,4 @@
-package pt.raidline.api.fuzzy.component;
+package pt.raidline.api.fuzzy.processors.schema.component;
 
 import java.util.function.UnaryOperator;
 
