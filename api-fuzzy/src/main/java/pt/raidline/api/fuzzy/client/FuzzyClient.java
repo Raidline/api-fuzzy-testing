@@ -1,6 +1,5 @@
 package pt.raidline.api.fuzzy.client;
 
-import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
@@ -15,9 +14,9 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 
-import static pt.raidline.api.fuzzy.assertions.AssertionUtils.*;
+import static pt.raidline.api.fuzzy.assertions.AssertionUtils.aggregateErrors;
+import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 
 //todo: the httpclient creation needs more care.. this is just to make a POC of this
 public class FuzzyClient {
