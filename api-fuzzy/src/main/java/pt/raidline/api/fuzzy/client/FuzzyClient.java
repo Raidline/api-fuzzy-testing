@@ -1,6 +1,5 @@
 package pt.raidline.api.fuzzy.client;
 
-import pt.raidline.api.fuzzy.custom.AsyncQueue;
 import pt.raidline.api.fuzzy.custom.PathSupplierIterator;
 import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
@@ -9,6 +8,7 @@ import pt.raidline.api.fuzzy.processors.paths.model.Path.PathOperation;
 import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,9 +17,11 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.ThreadFactory;
 
+import static java.util.concurrent.StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
@@ -32,6 +34,10 @@ public class FuzzyClient {
             .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(Duration.ofSeconds(20))
             .build();
+
+    private static final ThreadFactory threadFactory = Thread.ofVirtual()
+            .name("Fuzzy-Tester-VT", 0)
+            .factory();
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
                                List<Path> paths, AppArguments.Arg server) {
@@ -46,7 +52,7 @@ public class FuzzyClient {
 
         // default value to try and not allocate memory while sending the requests
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
-        var queue = new AsyncQueue();
+        var concurrencyGate = new Semaphore(10);
 
         do {
             var iterator = pathsIterator.next();
@@ -59,29 +65,37 @@ public class FuzzyClient {
 
             do {
                 var path = iterator.next();
-                for (PathOperation operation : path.operations()) {
-                    var request = buildRequest(
-                            server.value(),
-                            operation,
-                            requestBuilder,
-                            path, schemaGraph
-                    );
-                    CLILogger.debug("Sending request : [%s]", request);
+                try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(),
+                        cf -> cf.withThreadFactory(threadFactory))) {
+                    for (PathOperation operation : path.operations()) {
+                        var request = buildRequest(
+                                server.value(),
+                                operation,
+                                requestBuilder,
+                                path, schemaGraph
+                        );
 
-                    Supplier<CompletableFuture<Void>> action = () -> client.sendAsync(request,
-                                    HttpResponse.BodyHandlers.ofString())
-                            .thenAccept(res ->
-                                    CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body()));
+                        CLILogger.debug("Sending request : [%s]", request);
 
-                    while (!queue.enqueue(action)) {
-                        Thread.yield(); // give the room to another thread
+                        scope.fork(() -> {
+                            try {
+                                concurrencyGate.acquire();
+                                var res = client.send(request, HttpResponse.BodyHandlers.ofString());
+                                CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body());
+                            } catch (IOException | InterruptedException e) {
+                                CLILogger.severe("Request failed: " + e.getMessage());
+                            } finally {
+                                concurrencyGate.release();
+                            }
+                        });
                     }
 
+                    scope.join();
+                } catch (InterruptedException e) {
+                    CLILogger.severe("Requests failed: " + e.getMessage());
                 }
             } while (iterator.hasNext());
         } while (pathsIterator.hasNext());
-
-        queue.syncAll();
     }
 
     private HttpRequest buildRequest(String basePath, PathOperation operation, HttpRequest.Builder builder,
