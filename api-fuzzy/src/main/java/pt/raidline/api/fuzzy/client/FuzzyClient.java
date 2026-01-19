@@ -1,5 +1,6 @@
 package pt.raidline.api.fuzzy.client;
 
+import pt.raidline.api.fuzzy.custom.AsyncQueue;
 import pt.raidline.api.fuzzy.custom.PathSupplierIterator;
 import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
@@ -14,12 +15,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
-import static java.util.concurrent.CompletableFuture.allOf;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
@@ -44,12 +44,9 @@ public class FuzzyClient {
                 .timeout(Duration.ofMinutes(2))
                 .header("Content-Type", "application/json");
 
-        //todo: when we turn this into something more serious, we could make a Queue where we just send X amounts of
-        // requests at the same time to not make the system go down. That might be a consequence of the params
-
         // default value to try and not allocate memory while sending the requests
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
-        var cyclesEnqueued = new ArrayList<CompletableFuture<Void>>(NUMBER_OF_CYCLES);
+        var queue = new AsyncQueue(16);
 
         do {
             var iterator = pathsIterator.next();
@@ -60,7 +57,6 @@ public class FuzzyClient {
 
             CLILogger.debug("Starting new round of requests");
 
-            var requestsEnqueued = new ArrayList<CompletableFuture<Void>>(16);
             do {
                 var path = iterator.next();
                 for (PathOperation operation : path.operations()) {
@@ -71,18 +67,21 @@ public class FuzzyClient {
                             path, schemaGraph
                     );
                     CLILogger.debug("Sending request : [%s]", request);
-                    requestsEnqueued.add(client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+
+                    Supplier<CompletableFuture<Void>> action = () -> client.sendAsync(request,
+                                    HttpResponse.BodyHandlers.ofString())
                             .thenAccept(res ->
-                                    CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body())));
+                                    CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body()));
+
+                    while (!queue.enqueue(action)) {
+                        Thread.yield(); // give the room to another thread
+                    }
+
                 }
             } while (iterator.hasNext());
-
-            cyclesEnqueued.add(allOf(requestsEnqueued.toArray(CompletableFuture[]::new))
-                    .thenAccept(__ -> CLILogger.debug("Finished all requests for a single cycle")));
         } while (pathsIterator.hasNext());
 
-        allOf(cyclesEnqueued.toArray(CompletableFuture[]::new))
-                .thenAccept(__ -> CLILogger.debug("Completed all requests for all cycles")).join();
+        queue.syncAll();
     }
 
     private HttpRequest buildRequest(String basePath, PathOperation operation, HttpRequest.Builder builder,

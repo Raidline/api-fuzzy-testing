@@ -17,6 +17,10 @@ Why Java? Because i wanted a project where i could learn/investigate the virtual
 Is the Java the best language for CLI? No. But i wanted to do this project and since i want to investigate
 virtualThreads in Java, you get CLI app in Java. BIG W!
 
+> **IMPORTANT:** Java HttpClient does not support PATCH HTTP method. I'm not going, for this Java version, to add specific
+> code to send PATCH requests.
+> So, no PATCH requests can be made
+
 > **Note:** If everything goes well, i will probably re-do this in a more nice language for CLI (e.g Go)
 
 ### How It Works
@@ -44,7 +48,7 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 ### Load & Concurrency
 
-- [ ] **Custom Number of simultaneous Requests** – Define an upper limit for outgoing requests. Default is 10.
+- [ ] **Custom Number of simultaneous Requests** – Define an upper limit for **all** outgoing requests. Default is 10.
 - [x] **Concurrent API Requests** – Support for sending multiple simultaneous requests to the API
 - [ ] **Concurrent Requests** – Support for sending multiple simultaneous requests to the same endpoint
 - [ ] **Exponential User Growth** – Define an initial number of virtual users and configure automatic exponential
