@@ -65,7 +65,7 @@ public final class CLILogger {
         var lineNumber = (int) params[1];
         var message = (String) params[2];
 
-        return "[%s:%d] %s".formatted(className, lineNumber, message);
+        return "[%s]-[%s:%d] %s".formatted(Thread.currentThread().getName(), className, lineNumber, message);
     }
 
     private static CallerInfo getCallerInfo() {

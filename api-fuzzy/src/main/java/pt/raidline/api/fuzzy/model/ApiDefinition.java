@@ -35,6 +35,7 @@ public record ApiDefinition(
     public record PathItem(Operation get,
                            Operation post,
                            Operation put,
+                           Operation patch,
                            Operation delete) {
     }
 

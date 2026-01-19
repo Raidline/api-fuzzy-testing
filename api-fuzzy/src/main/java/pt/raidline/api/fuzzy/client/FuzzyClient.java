@@ -14,9 +14,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.aggregateErrors;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
@@ -45,6 +47,10 @@ public class FuzzyClient {
                 .timeout(Duration.ofMinutes(2))
                 .header("Content-Type", "application/json");
 
+        //todo: when we turn this into something more serious, we could make a Queue where we just send X amounts of
+        // requests at the same time
+        var requestsEnqueued = new ArrayList<CompletableFuture<Void>>(16); // default value
+
         do {
             var path = paths.next();
 
@@ -56,9 +62,15 @@ public class FuzzyClient {
                         path, schemaGraph
                 );
 
-                sendRequest(request);
+                CLILogger.debug("Sending request : [%s]", request);
+
+                requestsEnqueued.add(client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                        .thenAccept(res ->
+                                CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body())));
             }
         } while (paths.hasNext());
+
+        CompletableFuture.allOf(requestsEnqueued.toArray(CompletableFuture[]::new)).join();
     }
 
     private HttpRequest buildRequest(String basePath, PathOperation operation, HttpRequest.Builder builder,
@@ -98,20 +110,6 @@ public class FuzzyClient {
     private static String buildBody(Map<String, SchemaBuilderNode> graph, PathOperation operation) {
         return graph.get(
                 ComponentBuilder.trimSchemaKeyFromRef(operation.request().ref())).buildSchema();
-    }
-
-    private void sendRequest(HttpRequest request) {
-        try {
-            CLILogger.debug("Sending request : [%s]", request);
-
-            var res = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            CLILogger.info("Response from server : [%s]", res.body());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static String resolvePathParams(PathOperation postOp, String path) {
