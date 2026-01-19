@@ -79,7 +79,7 @@ public class PathProcessor {
         return new PathOperation(httpOperation, params, successResponses, errorResponses, request);
     }
 
-    // Define a temporary key for grouping
+    // Define a temporary name for grouping
     private enum ResponseType {SUCCESS, ERROR, IGNORED}
 
     private Map<ResponseType, Map<Integer, Path.OperationExchange>> digestResponses(ApiDefinition.Operation operation,

@@ -26,7 +26,7 @@ public record Path(String key, List<PathOperation> operations) {
         }
     }
 
-    public record PathParameter(String key, ApiDefinition.Schema schema) {
+    public record PathParameter(String name, ApiDefinition.Schema schema) {
     }
 
     public enum ParameterLocation {

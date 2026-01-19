@@ -13,10 +13,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.aggregateErrors;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
+import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
 //todo: the httpclient creation needs more care.. this is just to make a POC of this
 public class FuzzyClient {
@@ -72,7 +74,7 @@ public class FuzzyClient {
 
                 var res = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-                CLILogger.info("Response for server : [%s]", res.body());
+                CLILogger.info("Response from server : [%s]", res.body());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             } catch (InterruptedException e) {
@@ -105,9 +107,47 @@ public class FuzzyClient {
 
         //todo: do not forget headers, resolve path params!
         return builder
-                .uri(URI.create(basePath + path.key()))
+                .uri(URI.create(basePath + resolvePathParams(postOp, path.key())))
                 .POST(HttpRequest.BodyPublishers.ofString(
                         body.buildSchema()
                 )).build();
+    }
+
+    private static String resolvePathParams(Path.PathOperation postOp, String path) {
+        StringBuilder newPath = new StringBuilder();
+        var parts = path.split("/");
+
+        for (String part : parts) {
+            if (part.contains("{")) {
+                newPath.append("/")
+                        .append(transformParam(postOp.opParams(), part));
+            } else {
+                newPath.append(path);
+            }
+        }
+
+        return newPath.toString();
+    }
+
+    //todo: we can improve this by making this into a map
+    private static String transformParam(Map<Path.ParameterLocation, List<Path.PathParameter>> uriParams,
+                                         String param) {
+        precondition("Path Parameter transformation",
+                "Found an '{' and we have no params!",
+                () -> uriParams.containsKey(Path.ParameterLocation.PATH));
+
+        var pathParams = uriParams.get(Path.ParameterLocation.PATH);
+
+        for (Path.PathParameter pathParam : pathParams) {
+            if (pathParam.name().equalsIgnoreCase(param)) {
+                return "123";
+            }
+        }
+
+        precondition("Path Parameter transformation",
+                "Param : [%s] was not found in the schema".formatted(param),
+                () -> false);
+
+        return null;
     }
 }

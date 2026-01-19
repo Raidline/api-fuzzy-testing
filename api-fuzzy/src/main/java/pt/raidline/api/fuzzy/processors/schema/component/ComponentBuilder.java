@@ -35,11 +35,11 @@ public final class ComponentBuilder {
         public String buildBody(UnaryOperator<String> onRef) {
             AssertionUtils.internalAssertion("Properties on Schema",
                     () -> schema.properties() != null || schema.additionalProperties() != null,
-                    "For key : [%s] the schema properties and additionalProperties are null".formatted(key));
+                    "For name : [%s] the schema properties and additionalProperties are null".formatted(key));
             StringBuilder obj = new StringBuilder("{\n");
 
             if (schema.additionalProperties() != null) { //this is a map
-                //key are always string
+                //name are always string
                 var props = schema.additionalProperties();
 
                 if (props.properties() != null) {
@@ -89,14 +89,14 @@ public final class ComponentBuilder {
 
         private void buildMap(StringBuilder body, Consumer<String> appender) {
             int mapSize = 5;
-            String keyPrefix = "key";
+            String keyPrefix = "name";
 
             for (int i = 0; i < mapSize; i++) {
                 var key = keyPrefix + i;
 
                 appendProperty(key, body); //"keyx" :
                 appender.accept(key);
-                //body.append(buildValue(key, schema, onRef)).append(",");
+                //body.append(buildValue(name, schema, onRef)).append(",");
             }
             body.append("\n");
         }

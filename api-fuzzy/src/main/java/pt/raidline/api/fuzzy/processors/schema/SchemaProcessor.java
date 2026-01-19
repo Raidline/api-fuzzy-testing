@@ -18,7 +18,7 @@ public class SchemaProcessor {
     private SchemaBuilderNode processSchemaProp(String key, ApiDefinition.Schema currSchema,
                                                 Map<String, ApiDefinition.Schema> schemaDefinition, Map<String, SchemaBuilderNode> componentGraphNodes) {
         Objects.requireNonNull(key);
-        Objects.requireNonNull(currSchema, "Schema is null for key [%s]".formatted(key));
+        Objects.requireNonNull(currSchema, "Schema is null for name [%s]".formatted(key));
         Objects.requireNonNull(schemaDefinition);
 
         if (componentGraphNodes.containsKey(key)) {
@@ -46,11 +46,11 @@ public class SchemaProcessor {
     }
 
     public Map<String, SchemaBuilderNode> processSchemaNodeGraph(ApiDefinition.Components components) {
-        precondition("Component key",
+        precondition("Component name",
                 "In order to proceed, you need to define the components part of the schema",
                 () -> components != null);
 
-        precondition("Component key",
+        precondition("Component name",
                 "In order to proceed, you need to define the schemas part of the components",
                 () -> components.schemas() != null && !components.schemas().isEmpty());
 
