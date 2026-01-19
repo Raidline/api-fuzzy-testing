@@ -1,6 +1,6 @@
 .idea
 
-src/main/resources/examples/real
+api-fuzzy/src/main/resources/examples/real
 
 target/
 !.mvn/wrapper/maven-wrapper.jar
