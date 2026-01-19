@@ -17,8 +17,4 @@ public enum HttpOperation {
     public boolean isGet() {
         return this == GET;
     }
-
-    public boolean isPost() {
-        return this == POST;
-    }
 }
