@@ -24,7 +24,6 @@ class FuzzyService {
         Objects.requireNonNull(server);
 
         var schemaGraph = this.schemaProcessor.processSchemaNodeGraph(definition.components());
-        //this.schemaProcessor.componentGraphNodes.forEach((k, v) -> CLILogger.info("Body for schema : [%s] -> %s", k, v));
         var paths = this.pathProcessor.processPaths(definition.paths());
         this.client.executeRequest(schemaGraph, paths, server);
     }

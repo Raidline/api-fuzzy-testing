@@ -14,7 +14,7 @@ import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 import static pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder.trimSchemaKeyFromRef;
 
 public class SchemaProcessor {
-    // For now, if we see cycles we just don't calculate the JSON again
+
     private SchemaBuilderNode processSchemaProp(String key, ApiDefinition.Schema currSchema,
                                                 Map<String, ApiDefinition.Schema> schemaDefinition, Map<String, SchemaBuilderNode> componentGraphNodes) {
         Objects.requireNonNull(key);

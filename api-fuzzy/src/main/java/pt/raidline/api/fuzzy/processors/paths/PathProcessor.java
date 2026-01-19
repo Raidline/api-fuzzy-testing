@@ -1,5 +1,6 @@
 package pt.raidline.api.fuzzy.processors.paths;
 
+import pt.raidline.api.fuzzy.custom.PathSupplierIterator;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
 import pt.raidline.api.fuzzy.model.HttpOperation;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
@@ -19,7 +20,11 @@ import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
 public class PathProcessor {
 
-    public Iterator<Path> processPaths(Map<String, ApiDefinition.PathItem> paths) {
+    private static final String CALCULATE_REQUEST_BODY_KEY_ASSERTION = "Calculate Request Body";
+    private static final String REQUEST_BODY_ASSERTION_KEY = "Request Body";
+    private static final String RESPONSE_BODY_ASSERTION_KEY = "Response Body";
+
+    public List<Path> processPaths(Map<String, ApiDefinition.PathItem> paths) {
         precondition("Path Processing",
                 "Received [null] for the paths inside the ApiDefinition ",
                 () -> paths != null);
@@ -34,8 +39,7 @@ public class PathProcessor {
             );
         }
 
-        //todo: we could (if justified) return a custom iterator
-        return pathsToOperations.iterator();
+        return pathsToOperations;
     }
 
     private List<PathOperation> extractOperations(ApiDefinition.PathItem value) {
@@ -84,11 +88,11 @@ public class PathProcessor {
 
     private Map<ResponseType, Map<Integer, Path.OperationExchange>> digestResponses(ApiDefinition.Operation operation,
                                                                                     Map<String, ApiDefinition.Response> responses) {
-        internalAssertion("Calculate Request Body",
+        internalAssertion(CALCULATE_REQUEST_BODY_KEY_ASSERTION,
                 () -> responses != null,
                 "Responses from a schema should not be null");
 
-        precondition("Calculate Request Body",
+        precondition(CALCULATE_REQUEST_BODY_KEY_ASSERTION,
                 "Operation [%s], Schema [%s] should contain responses".formatted(operation.getSanitizedDescription(),
                         String.join(",", responses.keySet())),
                 () -> containsSuccessResponses(responses) || containsErrorResponses(responses));
@@ -130,34 +134,34 @@ public class PathProcessor {
     }
 
     private Path.OperationExchange extractRequest(ApiDefinition.RequestBody requestBody) {
-        internalAssertion("Calculate Request Body",
+        internalAssertion(CALCULATE_REQUEST_BODY_KEY_ASSERTION,
                 () -> requestBody != null,
                 "Request from a schema should not be null");
 
         //there can only be one schema for the request, but we do not know the content beforehand
         // that is why we have a map with 1 value
 
-        internalAssertion("Request Body",
+        internalAssertion(REQUEST_BODY_ASSERTION_KEY,
                 () -> requestBody.content().size() == 1,
                 "Content should only have 1 possible schema");
 
         var exchange = new Path.OperationExchange[1];
         for (var mediaTypeEntry : requestBody.content().entrySet()) {
             var schema = mediaTypeEntry.getValue().schema();
-            internalAssertion("Request Body",
+            internalAssertion(REQUEST_BODY_ASSERTION_KEY,
                     () -> schema != null,
                     "The schema of the request cannot be null");
 
             String ref;
             ApiDefinition.SchemaType type;
             if (schema.type() != null && schema.type().isArray()) {
-                internalAssertion("Request Body",
+                internalAssertion(REQUEST_BODY_ASSERTION_KEY,
                         () -> schema.items() != null,
                         "The items of an array schema of the request cannot be null");
                 ref = schema.items().$ref();
                 type = ApiDefinition.SchemaType.ARRAY;
             } else {
-                internalAssertion("Request Body",
+                internalAssertion(REQUEST_BODY_ASSERTION_KEY,
                         () -> schema.$ref() != null,
                         "The ref an object schema of the request cannot be null");
                 ref = schema.$ref();
@@ -179,32 +183,32 @@ public class PathProcessor {
             return new Path.OperationExchange(null, null, null);
         }
 
-        internalAssertion("Response Body",
+        internalAssertion(RESPONSE_BODY_ASSERTION_KEY,
                 () -> responseBody.content() != null && !"204".equalsIgnoreCase(key),
                 "Response should have a content : [%s]".formatted(responseBody.toString()));
 
 
-        internalAssertion("Response Body",
+        internalAssertion(RESPONSE_BODY_ASSERTION_KEY,
                 () -> responseBody.content().size() == 1,
                 "Content should only have 1 possible schema");
 
         var exchange = new Path.OperationExchange[1];
         for (var mediaTypeEntry : responseBody.content().entrySet()) {
             var schema = mediaTypeEntry.getValue().schema();
-            internalAssertion("Response Body",
+            internalAssertion(RESPONSE_BODY_ASSERTION_KEY,
                     () -> schema != null,
                     "The schema of the response cannot be null");
 
             String ref;
             ApiDefinition.SchemaType type;
             if (schema.type() != null && schema.type().isArray()) {
-                internalAssertion("Response Body",
+                internalAssertion(RESPONSE_BODY_ASSERTION_KEY,
                         () -> schema.items() != null,
                         "The items of an array schema of the response cannot be null");
                 ref = schema.items().$ref();
                 type = ApiDefinition.SchemaType.ARRAY;
             } else {
-                internalAssertion("Response Body",
+                internalAssertion(RESPONSE_BODY_ASSERTION_KEY,
                         () -> schema.$ref() != null,
                         "The ref an object schema of the response cannot be null");
                 ref = schema.$ref();

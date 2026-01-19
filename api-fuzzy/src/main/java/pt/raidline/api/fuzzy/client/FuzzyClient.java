@@ -1,5 +1,6 @@
 package pt.raidline.api.fuzzy.client;
 
+import pt.raidline.api.fuzzy.custom.PathSupplierIterator;
 import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
@@ -7,7 +8,6 @@ import pt.raidline.api.fuzzy.processors.paths.model.Path.PathOperation;
 import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -15,62 +15,74 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static pt.raidline.api.fuzzy.assertions.AssertionUtils.aggregateErrors;
+import static java.util.concurrent.CompletableFuture.allOf;
+import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
-//todo: this class needs to have a little rework of the code
-
-//todo: the httpclient creation needs more care.. this is just to make a POC of this
 public class FuzzyClient {
 
-    private static final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+    private static final int NUMBER_OF_CYCLES = 5;
+
+    private static final HttpClient client = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(Duration.ofSeconds(20))
             .build();
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
-                               Iterator<Path> paths, AppArguments.Arg server) {
+                               List<Path> paths, AppArguments.Arg server) {
 
-        aggregateErrors("Client Preparation")
-                .onError("Schema cannot be null or empty",
-                        () -> schemaGraph != null && !schemaGraph.isEmpty())
-                .onError("Paths cannot be null or empty",
-                        () -> paths != null && paths.hasNext())
-                .complete();
+        internalAssertion("Client Preparation",
+                () -> schemaGraph != null && !schemaGraph.isEmpty(),
+                "Schema cannot be null or empty");
 
         var requestBuilder = HttpRequest.newBuilder()
                 .timeout(Duration.ofMinutes(2))
                 .header("Content-Type", "application/json");
 
         //todo: when we turn this into something more serious, we could make a Queue where we just send X amounts of
-        // requests at the same time
-        var requestsEnqueued = new ArrayList<CompletableFuture<Void>>(16); // default value
+        // requests at the same time to not make the system go down. That might be a consequence of the params
+
+        // default value to try and not allocate memory while sending the requests
+        var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
+        var cyclesEnqueued = new ArrayList<CompletableFuture<Void>>(NUMBER_OF_CYCLES);
 
         do {
-            var path = paths.next();
+            var iterator = pathsIterator.next();
 
-            for (PathOperation operation : path.operations()) {
-                var request = buildRequest(
-                        server.value(),
-                        operation,
-                        requestBuilder,
-                        path, schemaGraph
-                );
+            internalAssertion("Client Preparation",
+                    () -> iterator != null && iterator.hasNext(),
+                    "Paths cannot be null or empty");
 
-                CLILogger.debug("Sending request : [%s]", request);
+            CLILogger.debug("Starting new round of requests");
 
-                requestsEnqueued.add(client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                        .thenAccept(res ->
-                                CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body())));
-            }
-        } while (paths.hasNext());
+            var requestsEnqueued = new ArrayList<CompletableFuture<Void>>(16);
+            do {
+                var path = iterator.next();
+                for (PathOperation operation : path.operations()) {
+                    var request = buildRequest(
+                            server.value(),
+                            operation,
+                            requestBuilder,
+                            path, schemaGraph
+                    );
+                    CLILogger.debug("Sending request : [%s]", request);
+                    requestsEnqueued.add(client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                            .thenAccept(res ->
+                                    CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body())));
+                }
+            } while (iterator.hasNext());
 
-        CompletableFuture.allOf(requestsEnqueued.toArray(CompletableFuture[]::new)).join();
+            cyclesEnqueued.add(allOf(requestsEnqueued.toArray(CompletableFuture[]::new))
+                    .thenAccept(__ -> CLILogger.debug("Finished all requests for a single cycle")));
+        } while (pathsIterator.hasNext());
+
+        allOf(cyclesEnqueued.toArray(CompletableFuture[]::new))
+                .thenAccept(__ -> CLILogger.debug("Completed all requests for all cycles")).join();
     }
 
     private HttpRequest buildRequest(String basePath, PathOperation operation, HttpRequest.Builder builder,
