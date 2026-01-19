@@ -46,7 +46,7 @@ public class FuzzyClient {
 
         // default value to try and not allocate memory while sending the requests
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
-        var queue = new AsyncQueue(16);
+        var queue = new AsyncQueue();
 
         do {
             var iterator = pathsIterator.next();
