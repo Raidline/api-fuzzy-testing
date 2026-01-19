@@ -8,7 +8,7 @@ import pt.raidline.api.fuzzy.processors.paths.model.Path.PathOperation;
 import pt.raidline.api.fuzzy.processors.paths.model.Path.PathParameter;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +22,7 @@ public class PathProcessor {
     public Iterator<Path> processPaths(Map<String, ApiDefinition.PathItem> paths) {
         precondition("Path Processing",
                 "Received [null] for the paths inside the ApiDefinition ",
-                () -> paths == null);
+                () -> paths != null);
 
         var pathsToOperations = new ArrayList<Path>(paths.size());
         for (var entry : paths.entrySet()) {
@@ -46,7 +46,10 @@ public class PathProcessor {
         var ops = new ArrayList<PathOperation>(HttpOperation.values().length);
 
         for (HttpOperation operation : HttpOperation.values()) {
-            ops.add(processOperation(operation, operation.fromItemToOp.apply(value)));
+            var pathOperation = operation.fromItemToOp.apply(value);
+            if (pathOperation != null) {
+                ops.add(processOperation(operation, pathOperation));
+            }
         }
 
         return ops;
@@ -59,7 +62,7 @@ public class PathProcessor {
                 "Operation function in enum [%s] method should not return null."
                         .formatted(httpOperation.name()));
 
-        var params = new HashMap<ParameterLocation, List<PathParameter>>();
+        var params = new EnumMap<ParameterLocation, List<PathParameter>>(ParameterLocation.class);
         if (operation.parameters() != null) {
             params = calculateParams(operation.parameters());
         }
@@ -69,7 +72,7 @@ public class PathProcessor {
             request = extractRequest(operation.requestBody());
         }
 
-        var result = digestResponses(operation.responses());
+        var result = digestResponses(operation, operation.responses());
         var successResponses = result.getOrDefault(ResponseType.SUCCESS, Map.of());
         var errorResponses = result.getOrDefault(ResponseType.ERROR, Map.of());
 
@@ -79,19 +82,16 @@ public class PathProcessor {
     // Define a temporary key for grouping
     private enum ResponseType {SUCCESS, ERROR, IGNORED}
 
-    private Map<ResponseType, Map<Integer, Path.OperationExchange>> digestResponses(Map<String, ApiDefinition.Response> responses) {
+    private Map<ResponseType, Map<Integer, Path.OperationExchange>> digestResponses(ApiDefinition.Operation operation,
+                                                                                    Map<String, ApiDefinition.Response> responses) {
         internalAssertion("Calculate Request Body",
                 () -> responses != null,
                 "Responses from a schema should not be null");
 
         precondition("Calculate Request Body",
-                "Schema should contain a successful response",
-                () -> responses.containsKey("200") || responses.containsKey("201")
-                        || responses.containsKey("202") || responses.containsKey("204"));
-
-        precondition("Calculate Request Body",
-                "Schema should contain an error response",
-                () -> contains5xxErrors(responses) || contains4xxErrors(responses));
+                "Operation [%s], Schema [%s] should contain responses".formatted(operation.getSanitizedDescription(),
+                        String.join(",", responses.keySet())),
+                () -> containsSuccessResponses(responses) || containsErrorResponses(responses));
 
 
         return responses.entrySet().stream()
@@ -105,17 +105,26 @@ public class PathProcessor {
                         // Downstream collector: Transform the entries into the final Map format
                         Collectors.toMap(
                                 entry -> Integer.parseInt(entry.getKey()),
-                                entry -> extractResponse(entry.getValue())
+                                entry -> extractResponse(entry.getKey(), entry.getValue())
                         )
                 ));
     }
 
-    private boolean contains5xxErrors(Map<String, ApiDefinition.Response> responses) {
+    private static boolean containsSuccessResponses(Map<String, ApiDefinition.Response> responses) {
+        return responses.containsKey("200") || responses.containsKey("201")
+                || responses.containsKey("202") || responses.containsKey("204");
+    }
+
+    private static boolean containsErrorResponses(Map<String, ApiDefinition.Response> responses) {
+        return contains5xxErrors(responses) || contains4xxErrors(responses);
+    }
+
+    private static boolean contains5xxErrors(Map<String, ApiDefinition.Response> responses) {
         return responses.containsKey("500") || responses.containsKey("501") || responses.containsKey("502")
                 || responses.containsKey("503") || responses.containsKey("504");
     }
 
-    private boolean contains4xxErrors(Map<String, ApiDefinition.Response> responses) {
+    private static boolean contains4xxErrors(Map<String, ApiDefinition.Response> responses) {
         return responses.containsKey("400") || responses.containsKey("401") || responses.containsKey("402")
                 || responses.containsKey("403") || responses.containsKey("404") || responses.containsKey("412");
     }
@@ -165,7 +174,16 @@ public class PathProcessor {
         return exchange[0];
     }
 
-    private Path.OperationExchange extractResponse(ApiDefinition.Response responseBody) {
+    private Path.OperationExchange extractResponse(String key, ApiDefinition.Response responseBody) {
+        if ("204".equalsIgnoreCase(key)) {
+            return new Path.OperationExchange(null, null, null);
+        }
+
+        internalAssertion("Response Body",
+                () -> responseBody.content() != null && !"204".equalsIgnoreCase(key),
+                "Response should have a content : [%s]".formatted(responseBody.toString()));
+
+
         internalAssertion("Response Body",
                 () -> responseBody.content().size() == 1,
                 "Content should only have 1 possible schema");
@@ -203,13 +221,12 @@ public class PathProcessor {
         return exchange[0];
     }
 
-    private static HashMap<ParameterLocation, List<PathParameter>> calculateParams(List<ApiDefinition.Parameter> parameters) {
+    private static EnumMap<ParameterLocation, List<PathParameter>> calculateParams(List<ApiDefinition.Parameter> parameters) {
         internalAssertion("Calculate Params",
                 () -> parameters != null,
                 "Parameters from a schema should not be null");
 
-        var opParams = new HashMap<ParameterLocation,
-                List<PathParameter>>(parameters.size());
+        var opParams = new EnumMap<ParameterLocation, List<PathParameter>>(ParameterLocation.class);
 
         for (ApiDefinition.Parameter parameter : parameters) {
 

@@ -50,6 +50,8 @@ public class PetStoreServer {
             // Route: /pets vs /pets/{id}
             String[] parts = path.split("/");
 
+            System.out.println("got a request with path : [%s]".formatted(path));
+
             try {
                 if (parts.length == 2 && path.equals("/pets")) {
                     // Collection Operations
@@ -142,6 +144,7 @@ public class PetStoreServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             // Similar implementation for Users...
+            System.out.println("got a request with path : [%s]".formatted(exchange.getRequestURI().getPath()));
             sendResponse(exchange, 501, "{\"message\": \"Not Implemented in Demo\"}");
         }
     }

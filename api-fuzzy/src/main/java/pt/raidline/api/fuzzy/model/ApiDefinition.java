@@ -50,6 +50,26 @@ public record ApiDefinition(
             RequestBody requestBody,
             Map<String, Response> responses
     ) {
+
+        public String getSanitizedDescription() {
+            if (summary != null) {
+                return summary;
+            }
+
+            if (description != null) {
+                return description;
+            }
+
+            if (operationId != null) {
+                return operationId;
+            }
+
+            if (tags != null && !tags.isEmpty()) {
+                return String.join(",", tags);
+            }
+
+            return "NONE";
+        }
     }
 
     /**

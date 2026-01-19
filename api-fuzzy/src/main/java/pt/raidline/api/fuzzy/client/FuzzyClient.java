@@ -6,7 +6,7 @@ import pt.raidline.api.fuzzy.processors.paths.model.Path;
 import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
-import java.net.Authenticator;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -24,7 +24,7 @@ public class FuzzyClient {
     private static final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
             .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(Duration.ofSeconds(20))
-            .authenticator(Authenticator.getDefault()) //todo: see about this
+            //.authenticator(Authenticator.getDefault()) //todo: see about this
             .build();
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
@@ -43,7 +43,6 @@ public class FuzzyClient {
         //Here is a draft of that
 
         var requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(server.value()))
                 .timeout(Duration.ofMinutes(2)) //todo: see about this
                 .header("Content-Type", "application/json");
         //.POST(BodyPublishers.ofFile(Paths.get("file.json")))
@@ -56,21 +55,35 @@ public class FuzzyClient {
 
             if (path.operations()
                     .stream()
-                    .anyMatch(po -> po.op().isPost())) {
+                    .noneMatch(po -> po.op().isPost())) {
                 continue;
             }
 
-            var request = buildRequest(requestBuilder,
+            var request = buildRequest(server.value(), requestBuilder,
                     path, schemaGraph);
 
             //todo: just to get quick feedback
-            client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            /*client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
-                    .thenAccept(CLILogger::info);
+                    .thenAccept(CLILogger::info);*/
+
+            try {
+                CLILogger.debug("Sending request : [%s]", request);
+
+                var res = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                CLILogger.info("Response for server : [%s]", res.body());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            //.thenApply(HttpResponse::body)
+            //.thenAccept(CLILogger::info);
         } while (paths.hasNext());
     }
 
-    private HttpRequest buildRequest(HttpRequest.Builder builder,
+    private HttpRequest buildRequest(String basePath, HttpRequest.Builder builder,
                                      Path path, Map<String, SchemaBuilderNode> graph) {
 
         //todo: we are just doing a post for now to be sure we can make the request
@@ -90,9 +103,11 @@ public class FuzzyClient {
         var body = graph.get(
                 ComponentBuilder.trimSchemaKeyFromRef(postOp.request().ref()));
 
-        //todo: do not forget headers
-        return builder.POST(HttpRequest.BodyPublishers.ofString(
-                body.buildSchema()
-        )).build();
+        //todo: do not forget headers, resolve path params!
+        return builder
+                .uri(URI.create(basePath + path.key()))
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        body.buildSchema()
+                )).build();
     }
 }
