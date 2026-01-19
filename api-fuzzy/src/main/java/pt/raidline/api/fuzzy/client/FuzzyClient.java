@@ -114,19 +114,22 @@ public class FuzzyClient {
     }
 
     private static String resolvePathParams(Path.PathOperation postOp, String path) {
-        StringBuilder newPath = new StringBuilder();
+        StringBuilder newPath = new StringBuilder("/");
         var parts = path.split("/");
 
         for (String part : parts) {
+            if (part.isBlank()) {
+                continue;
+            }
             if (part.contains("{")) {
-                newPath.append("/")
-                        .append(transformParam(postOp.opParams(), part));
+                newPath.append(transformParam(postOp.opParams(), part))
+                        .append("/");
             } else {
-                newPath.append(path);
+                newPath.append(part).append("/");
             }
         }
 
-        return newPath.toString();
+        return newPath.deleteCharAt(newPath.length() - 1).toString();
     }
 
     //todo: we can improve this by making this into a map
@@ -136,16 +139,18 @@ public class FuzzyClient {
                 "Found an '{' and we have no params!",
                 () -> uriParams.containsKey(Path.ParameterLocation.PATH));
 
+        var sanitizedParam = param.substring(1, param.length() - 1);
+
         var pathParams = uriParams.get(Path.ParameterLocation.PATH);
 
         for (Path.PathParameter pathParam : pathParams) {
-            if (pathParam.name().equalsIgnoreCase(param)) {
+            if (pathParam.name().equalsIgnoreCase(sanitizedParam)) {
                 return "123";
             }
         }
 
         precondition("Path Parameter transformation",
-                "Param : [%s] was not found in the schema".formatted(param),
+                "Param : [%s] was not found in the schema".formatted(sanitizedParam),
                 () -> false);
 
         return null;
