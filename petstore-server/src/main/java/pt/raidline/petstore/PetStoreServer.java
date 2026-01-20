@@ -14,8 +14,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class PetStoreServer {
@@ -23,6 +25,8 @@ public class PetStoreServer {
     // Simulating a Database
     private static final Map<Long, Pet> petStore = new ConcurrentHashMap<>();
     private static final AtomicLong petIdGenerator = new AtomicLong(1);
+    private static final AtomicInteger reqCount = new AtomicInteger(0);
+
 
     public static void main(String[] args) throws IOException {
         // Create server on port 8080
@@ -30,10 +34,10 @@ public class PetStoreServer {
 
         // JAVA 25: Use Virtual Threads for high concurrency
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-
+        int limitReqCount = new Random().nextInt(10);
         // Define Routes
-        server.createContext("/pets", new PetHandler());
-        server.createContext("/users", new UserHandler());
+        server.createContext("/pets", new PetHandler(limitReqCount));
+        server.createContext("/users", new UserHandler(limitReqCount));
 
         System.out.println("🚀 PetStore Server started on http://localhost:8080");
         server.start();
@@ -42,15 +46,25 @@ public class PetStoreServer {
     // --- Handlers ---
 
     static class PetHandler implements HttpHandler {
+        private final int limitReqCount;
+
+        PetHandler(int limitReqCount) {
+            this.limitReqCount = limitReqCount;
+        }
+
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (reqCount.incrementAndGet() == limitReqCount) {
+                reqCount.set(0);
+                //sendResponse(exchange, 500, "Some error : oops");
+                System.exit(1);
+                return;
+            }
             String method = exchange.getRequestMethod();
             String path = exchange.getRequestURI().getPath();
 
             // Route: /pets vs /pets/{id}
             String[] parts = path.split("/");
-
-            System.out.println("got a request with path : [%s]".formatted(path));
 
             try {
                 if (parts.length == 2 && path.equals("/pets")) {
@@ -141,11 +155,21 @@ public class PetStoreServer {
     }
 
     static class UserHandler implements HttpHandler {
+        private final int limitReqCount;
+
+        UserHandler(int limitReqCount) {
+            this.limitReqCount = limitReqCount;
+        }
+
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            // Similar implementation for Users...
-            System.out.println("got a request with path : [%s]".formatted(exchange.getRequestURI().getPath()));
-            sendResponse(exchange, 501, "{\"message\": \"Not Implemented in Demo\"}");
+            if (reqCount.incrementAndGet() == limitReqCount) {
+                reqCount.set(0);
+                sendResponse(exchange, 501, "{\"message\": \"Not Implemented in Demo\"}");
+            } else {
+                sendResponse(exchange, 200, "{\"message\": \"Implemented in Demo\"}");
+            }
+
         }
     }
 

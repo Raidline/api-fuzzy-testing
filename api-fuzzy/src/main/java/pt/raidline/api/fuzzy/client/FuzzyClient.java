@@ -67,10 +67,10 @@ public class FuzzyClient {
         } while (pathsIterator.hasNext());
     }
 
-    private RequestManager.RequestIterator<String> createIterator(Path path, HttpRequest.Builder requestBuilder,
-                                                                  AppArguments.Arg server,
-                                                                  Map<String, SchemaBuilderNode> schemaGraph) {
-        return new RequestManager.RequestIterator<>() {
+    private RequestManager.RequestIterator createIterator(Path path, HttpRequest.Builder requestBuilder,
+                                                          AppArguments.Arg server,
+                                                          Map<String, SchemaBuilderNode> schemaGraph) {
+        return new RequestManager.RequestIterator() {
             private int current = 0;
 
             @Override
@@ -79,20 +79,29 @@ public class FuzzyClient {
             }
 
             @Override
-            public Callable<HttpResponse<String>> next() {
+            public Callable<Void> next(RequestManager.RunContext context) {
                 if (current >= path.operations().size()) {
                     throw new NoSuchElementException();
                 }
                 var operation = path.operations().get(current);
                 current++;
-                var request = buildRequest(server.value(), operation, requestBuilder, path, schemaGraph);
+                var request = buildRequest(server.value(),
+                        context,
+                        operation,
+                        requestBuilder, path, schemaGraph);
+                context.setContext(RequestManager.ContextKey.REQUEST, request);
                 CLILogger.debug("Sending request : [%s]", request);
-                return () -> client.send(request, HttpResponse.BodyHandlers.ofString());
+                return () -> {
+                    client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                    return null;
+                };
             }
         };
     }
 
-    private HttpRequest buildRequest(String basePath, PathOperation operation, HttpRequest.Builder builder,
+    private HttpRequest buildRequest(String basePath, RequestManager.RunContext context,
+                                     PathOperation operation, HttpRequest.Builder builder,
                                      Path path, Map<String, SchemaBuilderNode> graph) {
 
         var uriBuilder = builder
@@ -100,7 +109,7 @@ public class FuzzyClient {
 
         var headerBuilder = buildHeaders(uriBuilder, operation);
 
-        return decideHttpMethod(headerBuilder, operation, graph).build();
+        return decideHttpMethod(headerBuilder, context, operation, graph).build();
     }
 
     private HttpRequest.Builder buildHeaders(HttpRequest.Builder builder,
@@ -116,19 +125,28 @@ public class FuzzyClient {
     }
 
     private HttpRequest.Builder decideHttpMethod(HttpRequest.Builder builder,
+                                                 RequestManager.RunContext context,
                                                  PathOperation operation,
                                                  Map<String, SchemaBuilderNode> graph) {
         return switch (operation.op()) {
             case GET -> builder.GET();
-            case POST -> builder.POST(BodyPublishers.ofString(buildBody(graph, operation)));
-            case PUT -> builder.PUT(BodyPublishers.ofString(buildBody(graph, operation)));
+            case POST -> {
+                String body = buildBody(graph, operation);
+                context.setContext(RequestManager.ContextKey.REQUEST, body);
+                yield builder.POST(BodyPublishers.ofString(body));
+            }
+            case PUT -> {
+                String body = buildBody(graph, operation);
+                context.setContext(RequestManager.ContextKey.REQUEST, body);
+                yield builder.PUT(BodyPublishers.ofString(body));
+            }
             case DELETE -> builder.DELETE();
         };
     }
 
     private static String buildBody(Map<String, SchemaBuilderNode> graph, PathOperation operation) {
         return graph.get(
-                ComponentBuilder.trimSchemaKeyFromRef(operation.request().ref())).buildSchema();
+                ComponentBuilder.trimSchemaKeyFromRef(operation.request().ref())).buildSchema(); //todo: me no like this dependency
     }
 
     private static String resolvePathParams(PathOperation postOp, String path) {

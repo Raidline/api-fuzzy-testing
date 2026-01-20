@@ -9,7 +9,6 @@ import java.util.Map;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 
-//todo: probably some of the Schemas (query, path, etc..), could be a SchemaBuilder to be invocated later.
 public record Path(String key, List<PathOperation> operations) {
 
     public record PathOperation(HttpOperation op,

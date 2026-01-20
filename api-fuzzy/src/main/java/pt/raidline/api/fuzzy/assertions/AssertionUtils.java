@@ -88,11 +88,7 @@ public final class AssertionUtils {
                 DEBUG_FILE.createNewFile();
             }
 
-            try (
-                    PrintWriter writer = new PrintWriter(
-                            new FileWriter(DEBUG_FILE, true)
-                    )
-            ) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter(DEBUG_FILE, true))) {
                 String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
 
                 writer.println();
