@@ -1,21 +1,22 @@
-package pt.raidline.api.fuzzy.custom;
+package pt.raidline.api.fuzzy.client;
 
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 //No reason to believe at this point, we will have anything else as type
 
 //This is basically an infinite iterator, if we wanted to.
 // The number of cycles should be passed as a param
-public class PathSupplierIterator implements Iterator<Iterator<Path>> {
+class PathSupplierIterator implements Iterator<Iterator<Path>> {
 
     private final List<Path> upstream;
     private final int numberOfCycles;
     private int count;
 
-    public PathSupplierIterator(List<Path> upstream, int numberOfCycles) {
+    PathSupplierIterator(List<Path> upstream, int numberOfCycles) {
         this.upstream = upstream;
         this.numberOfCycles = numberOfCycles;
         this.count = 0;
@@ -28,6 +29,9 @@ public class PathSupplierIterator implements Iterator<Iterator<Path>> {
 
     @Override
     public Iterator<Path> next() {
+        if (count >= numberOfCycles) {
+            throw new NoSuchElementException();
+        }
         count++;
         return new InternalIterator(this.upstream);
     }
@@ -48,6 +52,9 @@ public class PathSupplierIterator implements Iterator<Iterator<Path>> {
 
         @Override
         public Path next() {
+            if (count >= items.size()) {
+                throw new NoSuchElementException();
+            }
             var value = items.get(count);
             count++;
             return value;

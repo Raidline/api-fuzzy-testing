@@ -1,6 +1,5 @@
 package pt.raidline.api.fuzzy.client;
 
-import pt.raidline.api.fuzzy.custom.PathSupplierIterator;
 import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
@@ -8,7 +7,6 @@ import pt.raidline.api.fuzzy.processors.paths.model.Path.PathOperation;
 import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,11 +15,9 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.StructuredTaskScope;
-import java.util.concurrent.ThreadFactory;
+import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
 
-import static java.util.concurrent.StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
@@ -35,9 +31,11 @@ public class FuzzyClient {
             .connectTimeout(Duration.ofSeconds(20))
             .build();
 
-    private static final ThreadFactory threadFactory = Thread.ofVirtual()
-            .name("Fuzzy-Tester-VT", 0)
-            .factory();
+    private final RequestManager manager;
+
+    public FuzzyClient() {
+        this.manager = new RequestManager(10); //todo: should be configurable
+    }
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
                                List<Path> paths, AppArguments.Arg server) {
@@ -52,7 +50,6 @@ public class FuzzyClient {
 
         // default value to try and not allocate memory while sending the requests
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
-        var concurrencyGate = new Semaphore(10);
 
         do {
             var iterator = pathsIterator.next();
@@ -65,38 +62,34 @@ public class FuzzyClient {
 
             do {
                 var path = iterator.next();
-                try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(),
-                        cf -> cf.withThreadFactory(threadFactory))) {
-                    for (PathOperation operation : path.operations()) {
-                        var request = buildRequest(
-                                server.value(),
-                                operation,
-                                requestBuilder,
-                                path, schemaGraph
-                        );
-
-                        CLILogger.debug("Sending request : [%s]", request);
-
-                        scope.fork(() -> {
-                            try {
-                                concurrencyGate.acquire();
-                                var res = client.send(request, HttpResponse.BodyHandlers.ofString());
-                                CLILogger.info("Response from server : [%d-%s]", res.statusCode(), res.body());
-                            } catch (IOException | InterruptedException e) {
-                                CLILogger.severe("Request failed: " + e.getMessage());
-                            } finally {
-                                concurrencyGate.release();
-                            }
-                        });
-                    }
-
-                    scope.join();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    CLILogger.severe("Requests failed: " + e.getMessage());
-                }
+                this.manager.submit(this.createIterator(path, requestBuilder, server, schemaGraph));
             } while (iterator.hasNext());
         } while (pathsIterator.hasNext());
+    }
+
+    private RequestManager.RequestIterator<String> createIterator(Path path, HttpRequest.Builder requestBuilder,
+                                                                  AppArguments.Arg server,
+                                                                  Map<String, SchemaBuilderNode> schemaGraph) {
+        return new RequestManager.RequestIterator<>() {
+            private int current = 0;
+
+            @Override
+            public boolean hasNext() {
+                return current < path.operations().size();
+            }
+
+            @Override
+            public Callable<HttpResponse<String>> next() {
+                if (current >= path.operations().size()) {
+                    throw new NoSuchElementException();
+                }
+                var operation = path.operations().get(current);
+                current++;
+                var request = buildRequest(server.value(), operation, requestBuilder, path, schemaGraph);
+                CLILogger.debug("Sending request : [%s]", request);
+                return () -> client.send(request, HttpResponse.BodyHandlers.ofString());
+            }
+        };
     }
 
     private HttpRequest buildRequest(String basePath, PathOperation operation, HttpRequest.Builder builder,

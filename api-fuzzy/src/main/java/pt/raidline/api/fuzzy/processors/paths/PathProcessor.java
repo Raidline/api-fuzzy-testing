@@ -1,6 +1,5 @@
 package pt.raidline.api.fuzzy.processors.paths;
 
-import pt.raidline.api.fuzzy.custom.PathSupplierIterator;
 import pt.raidline.api.fuzzy.model.ApiDefinition;
 import pt.raidline.api.fuzzy.model.HttpOperation;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
@@ -10,7 +9,6 @@ import pt.raidline.api.fuzzy.processors.paths.model.Path.PathParameter;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
