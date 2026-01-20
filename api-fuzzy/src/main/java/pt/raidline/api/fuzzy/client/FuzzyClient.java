@@ -92,6 +92,7 @@ public class FuzzyClient {
 
                     scope.join();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     CLILogger.severe("Requests failed: " + e.getMessage());
                 }
             } while (iterator.hasNext());
