@@ -56,7 +56,7 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 ### Reporting & Debugging
 
-- [ ] **Detailed Failure Output** – Comprehensive logging of failed requests including the full request body, headers,
+- [x] **Detailed Failure Output** – Comprehensive logging of failed requests including the full request body, headers,
   and response details
 - [ ] **Failure Replay** – Ability to re-run a specific test case that caused a failure for debugging and verification
   purposes

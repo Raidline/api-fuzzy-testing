@@ -92,7 +92,9 @@ public class FuzzyClient {
                 context.setContext(RequestManager.ContextKey.REQUEST, request);
                 CLILogger.debug("Sending request : [%s]", request);
                 return () -> {
-                    client.send(request, HttpResponse.BodyHandlers.ofString());
+                    var res = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                    context.setContext(RequestManager.ContextKey.RESPONSE, res);
 
                     return null;
                 };

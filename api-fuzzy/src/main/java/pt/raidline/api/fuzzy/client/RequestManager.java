@@ -4,12 +4,18 @@ import pt.raidline.api.fuzzy.logging.CLILogger;
 
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
@@ -29,10 +35,17 @@ public class RequestManager {
             Associated with Path : [%s]\s
              \
             Request Body : [%s]\s
+            Headers : [%s]\s
             Response Body : status - [%d], body : [%s]"""
             .formatted(context.run, context.innerRun,
                     context.getHttpRequest().map(req -> req.uri().getPath()).orElse("No Path"),
                     context.getHttpRequestBody().orElse("No Body"),
+                    context.getHttpRequest().map(req -> req.headers().map())
+                            .map(m -> m.entrySet()
+                                    .stream()
+                                    .map(entry -> entry.getKey() + ":" + String.join(",", entry.getValue()))
+                                    .collect(Collectors.joining(";")))
+                            .orElse("No headers"),
                     context.getResponseContext().map(HttpResponse::statusCode).orElse(1),
                     context.getResponseContext().map(HttpResponse::body).orElse("Error"));
 
@@ -62,11 +75,10 @@ public class RequestManager {
                     try {
                         this.gate.acquire();
                         clientCall.call();
-                        var response = context.getResponseContext()
-                                .orElseThrow();
-
-                        CLILogger.info("Response from server : [%d-%s]",
-                                response.statusCode(), response.body());
+                        context.getResponseContext()
+                                .ifPresent(response ->
+                                        CLILogger.info("Response from server : [%d-%s]",
+                                                response.statusCode(), response.body()));
                     } catch (Exception e) {
                         this.onFailure(e, context);
                     } finally {
@@ -77,16 +89,18 @@ public class RequestManager {
 
             scope.join();
         } catch (Exception e) {
-            System.out.println("last failure");
             this.onFailure(e, context);
         }
     }
 
-    //todo: this logs appear duplicated, try to understand why - all from inside scope
     private <E extends Throwable> void onFailure(E failure, RunContext context) {
         Objects.requireNonNull(failure);
         var message = cleanMessage(failure);
         CLILogger.severe("Requests failed: [%s]", message);
+        CLILogger.severe("Stacktrace:\n");
+        for (StackTraceElement stackTraceElement : failure.getStackTrace()) {
+            CLILogger.severe(stackTraceElement.toString());
+        }
         if (failure instanceof InterruptedException interrupted) {
             CLILogger.warn("Thread was interrupted: [%s]", interrupted.getMessage());
             Thread.currentThread().interrupt();
@@ -133,7 +147,7 @@ public class RequestManager {
         //at the moment response has only 1 context
         //keep it as single to not induce errors
         public Optional<HttpResponse<String>> getResponseContext() {
-            if (!context.containsKey(ContextKey.RESPONSE) || context.get(ContextKey.RESPONSE).containsKey(RESPONSE_KEY)) {
+            if (!context.containsKey(ContextKey.RESPONSE) || !context.get(ContextKey.RESPONSE).containsKey(RESPONSE_KEY)) {
                 return Optional.empty();
             }
 
@@ -141,7 +155,7 @@ public class RequestManager {
         }
 
         public Optional<HttpRequest> getHttpRequest() {
-            if (!context.containsKey(ContextKey.REQUEST) || context.get(ContextKey.REQUEST).containsKey(REQUEST_KEY)) {
+            if (!context.containsKey(ContextKey.REQUEST) || !context.get(ContextKey.REQUEST).containsKey(REQUEST_KEY)) {
                 return Optional.empty();
             }
 
@@ -149,7 +163,7 @@ public class RequestManager {
         }
 
         public Optional<String> getHttpRequestBody() {
-            if (!context.containsKey(ContextKey.REQUEST) || context.get(ContextKey.REQUEST).containsKey(REQUEST_BODY_KEY)) {
+            if (!context.containsKey(ContextKey.REQUEST) || !context.get(ContextKey.REQUEST).containsKey(REQUEST_BODY_KEY)) {
                 return Optional.empty();
             }
 

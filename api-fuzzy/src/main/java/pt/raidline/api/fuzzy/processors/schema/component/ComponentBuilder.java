@@ -2,6 +2,8 @@ package pt.raidline.api.fuzzy.processors.schema.component;
 
 import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.model.ApiDefinition.Schema;
+import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer;
+import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -161,19 +163,11 @@ public final class ComponentBuilder {
     }
 
 
-    //todo: apply random shit logic here
     static Object buildValue(String key, Schema schema, UnaryOperator<String> onRef) {
         return switch (schema.type()) {
-            case INTEGER -> 1;
-            case STRING -> {
-                if ("date-time".equalsIgnoreCase(schema.format())) {
-                    yield LocalDateTime.now().toString();
-                } else if ("date".equalsIgnoreCase(schema.format())) {
-                    yield Date.from(Instant.now()).toString();
-                }
-
-                yield "\"some string\"";
-            }
+            case INTEGER -> ValueRandomizer.randomizeIntValue();
+            case STRING -> ValueRandomizer.randomizeStringValue(StringFormat.fromString(schema.format()));
+            case BOOLEAN -> ValueRandomizer.randomizeBoolValue();
             case ARRAY -> {
                 List<Object> values = new ArrayList<>();
                 int size = 5;
@@ -185,7 +179,6 @@ public final class ComponentBuilder {
                 yield values;
             }
             case OBJECT -> new SchemaObjectBuilder(key, schema).buildBody(onRef);
-            case BOOLEAN -> true;
         };
     }
 }
