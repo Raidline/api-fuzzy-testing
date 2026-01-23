@@ -16,6 +16,14 @@ public final class ArgumentParser {
     private static final String NEEDED_PARAMS =
             "-f='filename';-s='localhost:xxxx'";
 
+    //todo: add the following params (for controlling flow)
+    // -t -> maximum running time
+    // -e -> ending status code
+    //todo: add the following params (for controlling behaviour)
+    // -r -> limit of requests (default 10)
+    // -c -> concurrent requests to same endpoint
+    // -u -> upper limit of users (grow internally)
+
     private static final Map<String, ArgParser> MANDATORY_PARAMS = Map.of(
             "-f",
             new FileArgParser(),
@@ -43,7 +51,7 @@ public final class ArgumentParser {
                         () -> paramExists(args, "-s"))
                 .onError("You have more params than what is supported : [%s]".formatted(
                                 args.length),
-                        () -> args.length == MANDATORY_PARAMS.size() + NON_MANDATORY_PARAMS.size())
+                        () -> args.length > MANDATORY_PARAMS.size() + NON_MANDATORY_PARAMS.size())
                 .complete();
 
         var argBuilder = AppArguments.toBuilder();

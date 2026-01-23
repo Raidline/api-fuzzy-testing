@@ -5,10 +5,7 @@ import pt.raidline.api.fuzzy.model.ApiDefinition.Schema;
 import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer;
 import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;

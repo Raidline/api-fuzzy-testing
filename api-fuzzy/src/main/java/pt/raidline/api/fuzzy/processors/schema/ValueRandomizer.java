@@ -9,14 +9,24 @@ import java.util.function.Supplier;
 public final class ValueRandomizer {
 
     private static final Supplier<ThreadLocalRandom> random = ThreadLocalRandom::current;
-    private static final String[] alphabet = new String[] {
-            "A"
+    private static final String[] alphabet = new String[]{
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+            "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
+    };
+
+    private static final String[] alphabetUpperCase = new String[]{
+            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+            "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
+    };
+
+    private static final String[] symbols = new String[]{
+            "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/",
+            ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~"
     };
 
     private ValueRandomizer() {
     }
 
-    //todo: complete
     public static String randomizeStringValue(StringFormat format) {
         var randomizer = random.get();
         return switch (format) {
@@ -26,16 +36,40 @@ public final class ValueRandomizer {
                     .toString();
             case DATE -> Date.from(Instant.now())
                     .toString();
-            case DEFAULT -> "\"some string\"";
+            case DEFAULT -> "\"" + randomString(randomizer) + "\"";
         };
     }
 
+    private static String randomString(ThreadLocalRandom randomizer) {
+        var stringLen = randomizer.nextInt(0, 15);
+        var output = new StringBuilder();
+        for (int i = 0; i < stringLen; i++) {
+            var alphabetRndIdx = randomizer.nextInt(0, alphabet.length);
+            var alphabetUpperRndIdx = randomizer.nextInt(0, alphabetUpperCase.length);
+            var symbolsRndIdx = randomizer.nextInt(0, symbols.length);
+
+            if (randomizeBoolValue()) { // Allow Upper case
+                output.append(alphabetUpperCase[alphabetUpperRndIdx]);
+            } else {
+                output.append(alphabet[alphabetRndIdx]);
+            }
+
+            if (randomizeBoolValue()) { // Allow symbols
+                output.append(symbols[symbolsRndIdx]);
+            }
+        }
+
+        return output.toString();
+    }
+
     public static int randomizeIntValue() {
-        return 1;
+        var randomizer = random.get();
+        return randomizer.nextInt();
     }
 
     public static boolean randomizeBoolValue() {
-        return false;
+        var randomizer = random.get();
+        return randomizer.nextBoolean();
     }
 
     public enum StringFormat {
