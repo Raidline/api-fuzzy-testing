@@ -11,20 +11,18 @@ import java.util.Objects;
 class FuzzyService {
     private final SchemaProcessor schemaProcessor;
     private final PathProcessor pathProcessor;
-    private final FuzzyClient client;
 
     FuzzyService() {
         this.pathProcessor = new PathProcessor();
         this.schemaProcessor = new SchemaProcessor();
-        this.client = new FuzzyClient();
     }
 
-    void process(ApiDefinition definition, AppArguments.Arg server) {
+    void process(ApiDefinition definition, AppArguments args) {
         Objects.requireNonNull(definition);
-        Objects.requireNonNull(server);
+        Objects.requireNonNull(args);
 
         var schemaGraph = this.schemaProcessor.processSchemaNodeGraph(definition.components());
         var paths = this.pathProcessor.processPaths(definition.paths());
-        this.client.executeRequest(schemaGraph, paths, server);
+        new FuzzyClient(args).executeRequest(schemaGraph, paths, args);
     }
 }

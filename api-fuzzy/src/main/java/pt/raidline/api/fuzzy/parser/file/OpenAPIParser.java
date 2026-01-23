@@ -12,14 +12,11 @@ import pt.raidline.api.fuzzy.model.ApiDefinition;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
-//TODO: implement parallel parsing for the JSON file
-
 public class OpenAPIParser implements Parser {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    // I should do this in a parallel fashion, probably.
     @Override
     public ApiDefinition parse(String path) {
         CLILogger.debug("Parsing schema file : %s", path);

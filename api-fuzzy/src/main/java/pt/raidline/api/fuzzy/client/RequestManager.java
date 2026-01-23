@@ -4,6 +4,8 @@ import pt.raidline.api.fuzzy.logging.CLILogger;
 
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,13 +52,23 @@ public class RequestManager {
                     context.getResponseContext().map(HttpResponse::body).orElse("Error"));
 
     private final Semaphore gate;
+    //todo: apply this values below
+    private final int concurrentEndpointCalls;
+    private final int exponentialUserGrowth;
+    private final int endingCondition;
+    private final Duration maxTime;
     private int run;
     private final AtomicInteger innerRun;
 
-    RequestManager(int concurrencyGate) {
+    RequestManager(int concurrencyGate, Integer concurrentEndpointCalls, Integer exponentialUserGrowth,
+                   Integer endingCondition, Long maxTime) {
         this.gate = new Semaphore(concurrencyGate);
+        this.concurrentEndpointCalls = concurrentEndpointCalls;
+        this.exponentialUserGrowth = exponentialUserGrowth;
+        this.endingCondition = endingCondition;
         this.run = 0;
         this.innerRun = new AtomicInteger(0);
+        this.maxTime = Duration.of(maxTime, ChronoUnit.MINUTES);
     }
 
     void submit(RequestIterator calls) {
@@ -67,7 +79,7 @@ public class RequestManager {
 
         var context = new RunContext(this.run);
         try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(),
-                taskScopeConfiguration)) {
+                taskScopeConfiguration.andThen(conf -> conf.withTimeout(this.maxTime)))) {
             do {
                 var clientCall = calls.next(context);
                 scope.fork(() -> {
@@ -76,9 +88,17 @@ public class RequestManager {
                         this.gate.acquire();
                         clientCall.call();
                         context.getResponseContext()
-                                .ifPresent(response ->
-                                        CLILogger.info("Response from server : [%d-%s]",
-                                                response.statusCode(), response.body()));
+                                .ifPresent(response -> {
+                                    CLILogger.info("Response from server : [%d-%s]",
+                                            response.statusCode(), response.body());
+
+                                    if (response.statusCode() == this.endingCondition) {
+                                        CLILogger.info("Ending condition has been met!");
+                                        CLILogger.severe(templateTerminationErrorMessage.apply(context));
+                                        System.exit(0);
+                                    }
+
+                                });
                     } catch (Exception e) {
                         this.onFailure(e, context);
                     } finally {
@@ -88,6 +108,13 @@ public class RequestManager {
             } while (calls.hasNext());
 
             scope.join();
+        } catch (StructuredTaskScope.TimeoutException e) {
+            // 4. TIMEOUT REACHED!
+            // The scope automatically cancels all running threads here.
+            //todo: deal with this - !mimo!
+            CLILogger.severe("Server shutdown: Max running time of %s exceeded.", maxTime);
+
+            // Optional: Perform extra cleanup or System.exit() if you really mean "shutdown server"
         } catch (Exception e) {
             this.onFailure(e, context);
         }

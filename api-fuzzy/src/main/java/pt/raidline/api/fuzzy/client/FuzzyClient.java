@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -23,7 +24,7 @@ import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 
 public class FuzzyClient {
 
-    private static final int NUMBER_OF_CYCLES = 5;
+    private static final int NUMBER_OF_CYCLES = 10;
 
     private static final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
@@ -33,12 +34,20 @@ public class FuzzyClient {
 
     private final RequestManager manager;
 
-    public FuzzyClient() {
-        this.manager = new RequestManager(10); //todo: should be configurable
+    public FuzzyClient(AppArguments args) {
+        this.manager = new RequestManager(args.concurrentCallsGate.value(),
+                args.concurrentEndpointCalls.value(),
+                args.exponentialUserGrowth.value(),
+                args.endingCondition.value(),
+                args.maxTime.value());
     }
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
-                               List<Path> paths, AppArguments.Arg server) {
+                               List<Path> paths, AppArguments arguments) {
+
+        internalAssertion("Client Preparation",
+                () -> arguments.server != null,
+                "Server value cannot be value");
 
         internalAssertion("Client Preparation",
                 () -> schemaGraph != null && !schemaGraph.isEmpty(),
@@ -62,13 +71,13 @@ public class FuzzyClient {
 
             do {
                 var path = iterator.next();
-                this.manager.submit(this.createIterator(path, requestBuilder, server, schemaGraph));
+                this.manager.submit(this.createIterator(path, requestBuilder, arguments.server, schemaGraph));
             } while (iterator.hasNext());
         } while (pathsIterator.hasNext());
     }
 
     private RequestManager.RequestIterator createIterator(Path path, HttpRequest.Builder requestBuilder,
-                                                          AppArguments.Arg server,
+                                                          AppArguments.Arg<String> server,
                                                           Map<String, SchemaBuilderNode> schemaGraph) {
         return new RequestManager.RequestIterator() {
             private int current = 0;
