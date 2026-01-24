@@ -3,6 +3,7 @@ package pt.raidline.api.fuzzy.processors.schema;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
@@ -19,11 +20,6 @@ public final class ValueRandomizer {
             "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
     };
 
-    private static final String[] symbols = new String[]{
-            "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/",
-            ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~"
-    };
-
     private ValueRandomizer() {
     }
 
@@ -36,6 +32,7 @@ public final class ValueRandomizer {
                     .toString();
             case DATE -> Date.from(Instant.now())
                     .toString();
+            case UUID -> UUID.randomUUID().toString();
             case DEFAULT -> "\"" + randomString(randomizer) + "\"";
         };
     }
@@ -46,16 +43,11 @@ public final class ValueRandomizer {
         for (int i = 0; i < stringLen; i++) {
             var alphabetRndIdx = randomizer.nextInt(0, alphabet.length);
             var alphabetUpperRndIdx = randomizer.nextInt(0, alphabetUpperCase.length);
-            var symbolsRndIdx = randomizer.nextInt(0, symbols.length);
 
             if (randomizeBoolValue()) { // Allow Upper case
                 output.append(alphabetUpperCase[alphabetUpperRndIdx]);
             } else {
                 output.append(alphabet[alphabetRndIdx]);
-            }
-
-            if (randomizeBoolValue()) { // Allow symbols
-                output.append(symbols[symbolsRndIdx]);
             }
         }
 
@@ -73,7 +65,10 @@ public final class ValueRandomizer {
     }
 
     public enum StringFormat {
-        DATE_TIME("date-time"), DATE("date"), DEFAULT("default");
+        DATE_TIME("date-time"),
+        DATE("date"),
+        UUID("uuid"),
+        DEFAULT("default");
 
         final String format;
 
@@ -88,6 +83,7 @@ public final class ValueRandomizer {
             return switch (form) {
                 case "date-time" -> DATE_TIME;
                 case "date" -> DATE;
+                case "uuid" -> UUID;
                 default -> DEFAULT;
             };
         }

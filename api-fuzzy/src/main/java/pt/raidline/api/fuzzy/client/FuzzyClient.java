@@ -4,6 +4,7 @@ import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
 import pt.raidline.api.fuzzy.processors.paths.model.Path.PathOperation;
+import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer;
 import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
@@ -21,10 +22,11 @@ import java.util.concurrent.Callable;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
+import static pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat.fromString;
 
 public class FuzzyClient {
 
-    private static final int NUMBER_OF_CYCLES = 10;
+    private static final int NUMBER_OF_CYCLES = Integer.MAX_VALUE;
 
     private static final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
@@ -130,7 +132,8 @@ public class FuzzyClient {
         }
 
         operation.opParams().get(Path.ParameterLocation.HEADER)
-                .forEach(pathParam -> builder.header(pathParam.name(), "213"));
+                .forEach(pathParam -> builder.header(pathParam.name(),
+                        ValueRandomizer.randomizeStringValue(ValueRandomizer.StringFormat.DEFAULT)));
         // all headers are strings probably, we can assume that, just need to build a random string here
         return builder;
     }
@@ -192,7 +195,11 @@ public class FuzzyClient {
 
         for (Path.PathParameter pathParam : pathParams) {
             if (pathParam.name().equalsIgnoreCase(sanitizedParam)) {
-                return "123";
+                if (pathParam.schema().type().isInteger()) {
+                    return String.valueOf(ValueRandomizer.randomizeIntValue());
+                } else {
+                    return ValueRandomizer.randomizeStringValue(fromString(pathParam.schema().format()));
+                }
             }
         }
 

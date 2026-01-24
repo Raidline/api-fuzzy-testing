@@ -5,6 +5,7 @@ import pt.raidline.api.fuzzy.logging.CLILogger;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Iterator;
 import java.util.Objects;
@@ -27,8 +28,6 @@ public class RequestManager {
     private static final ThreadFactory threadFactory = Thread.ofVirtual()
             .name("Fuzzy-Tester-VT", 0)
             .factory();
-    private static final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> taskScopeConfiguration =
-            config -> config.withThreadFactory(threadFactory);
 
     private static final Function<RunContext, String> templateTerminationErrorMessage = context -> """
             There as been an error on run : [%d]\s
@@ -57,6 +56,7 @@ public class RequestManager {
     private final int exponentialUserGrowth;
     private final int endingCondition;
     private final Duration maxTime;
+    private final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config;
     private int run;
     private final AtomicInteger innerRun;
 
@@ -68,7 +68,9 @@ public class RequestManager {
         this.endingCondition = endingCondition;
         this.run = 0;
         this.innerRun = new AtomicInteger(0);
-        this.maxTime = Duration.of(maxTime, ChronoUnit.MINUTES);
+        this.maxTime = Duration.of(maxTime, ChronoUnit.SECONDS); //todo: timeout not working
+        Duration timeout = Duration.between(Instant.now(), Instant.now().plus(this.maxTime));
+        this.config = config -> config.withThreadFactory(threadFactory).withTimeout(timeout);
     }
 
     void submit(RequestIterator calls) {
@@ -78,8 +80,8 @@ public class RequestManager {
         run++;
 
         var context = new RunContext(this.run);
-        try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(),
-                taskScopeConfiguration.andThen(conf -> conf.withTimeout(this.maxTime)))) {
+
+        try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(), config)) {
             do {
                 var clientCall = calls.next(context);
                 scope.fork(() -> {
@@ -111,10 +113,8 @@ public class RequestManager {
         } catch (StructuredTaskScope.TimeoutException e) {
             // 4. TIMEOUT REACHED!
             // The scope automatically cancels all running threads here.
-            //todo: deal with this - !mimo!
             CLILogger.severe("Server shutdown: Max running time of %s exceeded.", maxTime);
-
-            // Optional: Perform extra cleanup or System.exit() if you really mean "shutdown server"
+            System.exit(0);
         } catch (Exception e) {
             this.onFailure(e, context);
         }

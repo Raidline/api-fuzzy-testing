@@ -46,9 +46,6 @@ public final class ArgumentParser {
                         () -> paramExists(args, "-f"))
                 .onError("You need to pass the server location : [-s]",
                         () -> paramExists(args, "-s"))
-                .onError("You have more params than what is supported : [%s]".formatted(
-                                args.length),
-                        () -> args.length > MANDATORY_PARAMS.size() + NON_MANDATORY_PARAMS.size())
                 .complete();
 
         var argBuilder = AppArguments.toBuilder();
