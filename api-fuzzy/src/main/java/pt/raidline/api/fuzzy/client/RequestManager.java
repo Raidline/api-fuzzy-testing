@@ -4,9 +4,6 @@ import pt.raidline.api.fuzzy.logging.CLILogger;
 
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +25,9 @@ public class RequestManager {
     private static final ThreadFactory threadFactory = Thread.ofVirtual()
             .name("Fuzzy-Tester-VT", 0)
             .factory();
+
+    private static final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config =
+            config -> config.withThreadFactory(threadFactory);
 
     private static final Function<RunContext, String> templateTerminationErrorMessage = context -> """
             There as been an error on run : [%d]\s
@@ -55,22 +55,17 @@ public class RequestManager {
     private final int concurrentEndpointCalls;
     private final int exponentialUserGrowth;
     private final int endingCondition;
-    private final Duration maxTime;
-    private final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config;
     private int run;
     private final AtomicInteger innerRun;
 
     RequestManager(int concurrencyGate, Integer concurrentEndpointCalls, Integer exponentialUserGrowth,
-                   Integer endingCondition, Long maxTime) {
+                   Integer endingCondition) {
         this.gate = new Semaphore(concurrencyGate);
         this.concurrentEndpointCalls = concurrentEndpointCalls;
         this.exponentialUserGrowth = exponentialUserGrowth;
         this.endingCondition = endingCondition;
         this.run = 0;
         this.innerRun = new AtomicInteger(0);
-        this.maxTime = Duration.of(maxTime, ChronoUnit.SECONDS); //todo: timeout not working
-        Duration timeout = Duration.between(Instant.now(), Instant.now().plus(this.maxTime));
-        this.config = config -> config.withThreadFactory(threadFactory).withTimeout(timeout);
     }
 
     void submit(RequestIterator calls) {
@@ -110,11 +105,6 @@ public class RequestManager {
             } while (calls.hasNext());
 
             scope.join();
-        } catch (StructuredTaskScope.TimeoutException e) {
-            // 4. TIMEOUT REACHED!
-            // The scope automatically cancels all running threads here.
-            CLILogger.severe("Server shutdown: Max running time of %s exceeded.", maxTime);
-            System.exit(0);
         } catch (Exception e) {
             this.onFailure(e, context);
         }

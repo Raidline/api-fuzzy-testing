@@ -14,12 +14,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.function.Function;
 
+import static java.util.concurrent.StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 import static pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat.fromString;
@@ -35,13 +39,23 @@ public class FuzzyClient {
             .build();
 
     private final RequestManager manager;
+    private final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config;
+    private final Duration maxTime;
 
     public FuzzyClient(AppArguments args) {
+        this.maxTime = Duration.of(args.maxTime.value(), ChronoUnit.SECONDS);
+        Duration timeout = Duration.between(Instant.now(), Instant.now().plus(this.maxTime));
+        this.config = conf -> conf
+                .withThreadFactory(Thread.ofVirtual()
+                        .name("Outer-Loop-Tester-VT", 0)
+                        .factory())
+                .withTimeout(timeout);
+
         this.manager = new RequestManager(args.concurrentCallsGate.value(),
                 args.concurrentEndpointCalls.value(),
                 args.exponentialUserGrowth.value(),
-                args.endingCondition.value(),
-                args.maxTime.value());
+                args.endingCondition.value()
+        );
     }
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
@@ -59,10 +73,9 @@ public class FuzzyClient {
                 .timeout(Duration.ofMinutes(2))
                 .header("Content-Type", "application/json");
 
-        // default value to try and not allocate memory while sending the requests
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
 
-        do {
+        while (pathsIterator.hasNext()) {
             var iterator = pathsIterator.next();
 
             internalAssertion("Client Preparation",
@@ -71,11 +84,27 @@ public class FuzzyClient {
 
             CLILogger.debug("Starting new round of requests");
 
-            do {
-                var path = iterator.next();
-                this.manager.submit(this.createIterator(path, requestBuilder, arguments.server, schemaGraph));
-            } while (iterator.hasNext());
-        } while (pathsIterator.hasNext());
+            try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(), config)) {
+
+                do {
+                    var path = iterator.next();
+                    scope.fork(() -> this.manager.submit(
+                            this.createIterator(path, requestBuilder, arguments.server, schemaGraph))
+                    );
+                } while (iterator.hasNext());
+
+                scope.join();
+
+            } catch (StructuredTaskScope.TimeoutException e) {
+                // 4. TIMEOUT REACHED!
+                // The scope automatically cancels all running threads here.
+                CLILogger.severe("Server shutdown: Max running time of %s exceeded.", maxTime);
+                System.exit(0);
+            } catch (Exception e) {
+                CLILogger.severe("Requests failed: [%s]", e.getMessage());
+                System.exit(1);
+            }
+        }
     }
 
     private RequestManager.RequestIterator createIterator(Path path, HttpRequest.Builder requestBuilder,
