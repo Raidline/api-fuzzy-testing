@@ -12,15 +12,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static java.util.concurrent.StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow;
@@ -31,12 +30,6 @@ import static pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringForm
 public class FuzzyClient {
 
     private static final int NUMBER_OF_CYCLES = Integer.MAX_VALUE;
-
-    private static final HttpClient client = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(Duration.ofSeconds(20))
-            .build();
 
     private final RequestManager manager;
     private final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config;
@@ -51,7 +44,8 @@ public class FuzzyClient {
                         .factory())
                 .withTimeout(timeout);
 
-        this.manager = new RequestManager(args.concurrentCallsGate.value(),
+        this.manager = new RequestManager(
+                args.concurrentCallsGate.value(),
                 args.concurrentEndpointCalls.value(),
                 args.exponentialUserGrowth.value(),
                 args.endingCondition.value()
@@ -69,10 +63,6 @@ public class FuzzyClient {
                 () -> schemaGraph != null && !schemaGraph.isEmpty(),
                 "Schema cannot be null or empty");
 
-        var requestBuilder = HttpRequest.newBuilder()
-                .timeout(Duration.ofMinutes(2))
-                .header("Content-Type", "application/json");
-
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
 
         while (pathsIterator.hasNext()) {
@@ -89,7 +79,7 @@ public class FuzzyClient {
                 do {
                     var path = iterator.next();
                     scope.fork(() -> this.manager.submit(
-                            this.createIterator(path, requestBuilder, arguments.server, schemaGraph))
+                            this.createIterator(path, arguments.server, schemaGraph))
                     );
                 } while (iterator.hasNext());
 
@@ -101,43 +91,40 @@ public class FuzzyClient {
                 CLILogger.severe("Server shutdown: Max running time of %s exceeded.", maxTime);
                 System.exit(0);
             } catch (Exception e) {
-                CLILogger.severe("Requests failed: [%s]", e.getMessage());
+                CLILogger.severe("Requests failed: [%s]-[%s]", e.toString(), e.getMessage());
                 System.exit(1);
             }
         }
     }
 
-    private RequestManager.RequestIterator createIterator(Path path, HttpRequest.Builder requestBuilder,
+    private RequestManager.RequestIterator createIterator(Path path,
                                                           AppArguments.Arg<String> server,
                                                           Map<String, SchemaBuilderNode> schemaGraph) {
         return new RequestManager.RequestIterator() {
-            private int current = 0;
+            private final AtomicInteger current = new AtomicInteger(0);
 
             @Override
             public boolean hasNext() {
-                return current < path.operations().size();
+                return current.get() < path.operations().size();
             }
 
             @Override
-            public Callable<Void> next(RequestManager.RunContext context) {
-                if (current >= path.operations().size()) {
+            public HttpRequest next(RequestManager.RunContext context) {
+                if (current.get() >= path.operations().size()) {
                     throw new NoSuchElementException();
                 }
-                var operation = path.operations().get(current);
-                current++;
+
+                var requestBuilder = HttpRequest.newBuilder()
+                        .header("Content-Type", "application/json");
+
+                var operation = path.operations().get(current.getAndIncrement());
                 var request = buildRequest(server.value(),
                         context,
                         operation,
                         requestBuilder, path, schemaGraph);
                 context.setContext(RequestManager.ContextKey.REQUEST, request);
-                CLILogger.debug("Sending request : [%s]", request);
-                return () -> {
-                    var res = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-                    context.setContext(RequestManager.ContextKey.RESPONSE, res);
-
-                    return null;
-                };
+                return request;
             }
         };
     }

@@ -2,17 +2,13 @@ package pt.raidline.api.fuzzy.client;
 
 import pt.raidline.api.fuzzy.logging.CLILogger;
 
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Iterator;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.StructuredTaskScope;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -25,6 +21,12 @@ public class RequestManager {
     private static final ThreadFactory threadFactory = Thread.ofVirtual()
             .name("Fuzzy-Tester-VT", 0)
             .factory();
+
+    private static final HttpClient client = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .connectTimeout(Duration.ofSeconds(20))
+            .build();
 
     private static final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config =
             config -> config.withThreadFactory(threadFactory);
@@ -50,21 +52,21 @@ public class RequestManager {
                     context.getResponseContext().map(HttpResponse::statusCode).orElse(1),
                     context.getResponseContext().map(HttpResponse::body).orElse("Error"));
 
-    private final Semaphore gate;
     //todo: apply this values below
+    private final Semaphore callsThrottled;
     private final int concurrentEndpointCalls;
     private final int exponentialUserGrowth;
     private final int endingCondition;
-    private int run;
+    private AtomicInteger run;
     private final AtomicInteger innerRun;
 
-    RequestManager(int concurrencyGate, Integer concurrentEndpointCalls, Integer exponentialUserGrowth,
+    RequestManager(int concurrentCallsGate, Integer concurrentEndpointCalls, Integer exponentialUserGrowth,
                    Integer endingCondition) {
-        this.gate = new Semaphore(concurrencyGate);
+        this.callsThrottled = new Semaphore(concurrentCallsGate);
         this.concurrentEndpointCalls = concurrentEndpointCalls;
         this.exponentialUserGrowth = exponentialUserGrowth;
         this.endingCondition = endingCondition;
-        this.run = 0;
+        this.run = new AtomicInteger(0);
         this.innerRun = new AtomicInteger(0);
     }
 
@@ -72,34 +74,32 @@ public class RequestManager {
         Objects.requireNonNull(calls);
         internalAssertion("Submit Requests", calls::hasNext,
                 "You cannot submit an empty iterator for tasks");
-        run++;
 
-        var context = new RunContext(this.run);
+        var context = new RunContext(run.incrementAndGet());
 
         try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(), config)) {
             do {
-                var clientCall = calls.next(context);
+                var request = calls.next(context);
                 scope.fork(() -> {
                     context.setInnerRun(this.innerRun.incrementAndGet());
                     try {
-                        this.gate.acquire();
-                        clientCall.call();
-                        context.getResponseContext()
-                                .ifPresent(response -> {
-                                    CLILogger.info("Response from server : [%d-%s]",
-                                            response.statusCode(), response.body());
+                        callsThrottled.acquire();
+                        CLILogger.debug("Sending request : [%s]", request);
+                        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-                                    if (response.statusCode() == this.endingCondition) {
-                                        CLILogger.info("Ending condition has been met!");
-                                        CLILogger.severe(templateTerminationErrorMessage.apply(context));
-                                        System.exit(0);
-                                    }
+                        context.setContext(RequestManager.ContextKey.RESPONSE, response);
+                        CLILogger.info("Response from server : [%d-%s]",
+                                response.statusCode(), response.body());
 
-                                });
+                        if (response.statusCode() == this.endingCondition) {
+                            CLILogger.info("Ending condition has been met!");
+                            CLILogger.severe(templateTerminationErrorMessage.apply(context));
+                            System.exit(0);
+                        }
                     } catch (Exception e) {
                         this.onFailure(e, context);
                     } finally {
-                        this.gate.release();
+                        callsThrottled.release();
                     }
                 });
             } while (calls.hasNext());
@@ -113,7 +113,7 @@ public class RequestManager {
     private <E extends Throwable> void onFailure(E failure, RunContext context) {
         Objects.requireNonNull(failure);
         var message = cleanMessage(failure);
-        CLILogger.severe("Requests failed: [%s]", message);
+        CLILogger.severe("Requests failed: [%s]-[%s]", failure.getClass().getName(), message);
         CLILogger.severe("Stacktrace:\n");
         for (StackTraceElement stackTraceElement : failure.getStackTrace()) {
             CLILogger.severe(stackTraceElement.toString());
@@ -133,15 +133,11 @@ public class RequestManager {
         return failure.getMessage() != null ? failure.getMessage() : "Error occurred";
     }
 
+    interface RequestIterator {
 
-    interface RequestIterator extends Iterator<Callable<Void>> {
+        boolean hasNext();
 
-        Callable<Void> next(RunContext context);
-
-        @Override
-        default Callable<Void> next() {
-            return this.next(new RunContext(0));
-        }
+        HttpRequest next(RunContext context);
     }
 
     static class RunContext {
