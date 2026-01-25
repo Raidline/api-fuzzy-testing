@@ -6,17 +6,15 @@ public class AppArguments {
     public final Arg<String> file;
     public final Arg<String> server;
     public final Arg<Long> maxTime;
-    public final Arg<Integer> endingCondition;
     public final Arg<Integer> concurrentCallsGate;
     public final Arg<Integer> concurrentEndpointCalls;
     public final Arg<Integer> exponentialUserGrowth;
 
-    private AppArguments(Arg<String> file, Arg<String> server, Arg<Long> maxTime, Arg<Integer> endingCondition,
+    private AppArguments(Arg<String> file, Arg<String> server, Arg<Long> maxTime,
                          Arg<Integer> concurrentCallsGate, Arg<Integer> concurrentEndpointCalls, Arg<Integer> exponentialUserGrowth) {
         Objects.requireNonNull(file);
         Objects.requireNonNull(server);
         this.maxTime = maxTime;
-        this.endingCondition = endingCondition;
         this.concurrentCallsGate = concurrentCallsGate;
         this.concurrentEndpointCalls = concurrentEndpointCalls;
         this.exponentialUserGrowth = exponentialUserGrowth;
@@ -32,7 +30,6 @@ public class AppArguments {
         private Arg<String> file = null;
         private Arg<String> server = null;
         private Arg<Long> maxTime = null;
-        private Arg<Integer> endingCondition = null;
         private Arg<Integer> concurrentCallsGate = null;
         private Arg<Integer> concurrentEndpointCalls = null;
         private Arg<Integer> exponentialUserGrowth = null;
@@ -51,12 +48,6 @@ public class AppArguments {
 
         public AppArgumentsBuilder addMaxTime(String key, long value) {
             this.maxTime = new Arg<>(key, value);
-
-            return this;
-        }
-
-        public AppArgumentsBuilder addEndingCondition(String key, int value) {
-            this.endingCondition = new Arg<>(key, value);
 
             return this;
         }
@@ -84,10 +75,6 @@ public class AppArguments {
                 this.maxTime = new Arg<>("-t", Long.MAX_VALUE);
             }
 
-            if (this.endingCondition == null) {
-                this.endingCondition = new Arg<>("-e", -1);
-            }
-
             if (this.concurrentCallsGate == null) {
                 this.concurrentCallsGate = new Arg<>("-r", 10);
             }
@@ -100,7 +87,7 @@ public class AppArguments {
                 this.exponentialUserGrowth = new Arg<>("-u", 1);
             }
 
-            return new AppArguments(file, server, maxTime, endingCondition, concurrentCallsGate,
+            return new AppArguments(file, server, maxTime, concurrentCallsGate,
                     concurrentEndpointCalls, exponentialUserGrowth);
         }
     }

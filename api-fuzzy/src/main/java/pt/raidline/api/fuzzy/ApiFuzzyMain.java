@@ -6,10 +6,12 @@ import pt.raidline.api.fuzzy.parser.file.OpenAPIParser;
 public class ApiFuzzyMain {
 
     public static void main(String[] args) {
+        var controller = new TestController();
+        controller.init();
         var arguments = ArgumentParser.parseArguments(args);
         var def = new OpenAPIParser().parse(arguments.file.value());
 
-        new FuzzyService().process(def, arguments);
+        new FuzzyService(controller).process(def, arguments);
 
         //CLILogger.debug("API Definition : %s", def.toString());
     }

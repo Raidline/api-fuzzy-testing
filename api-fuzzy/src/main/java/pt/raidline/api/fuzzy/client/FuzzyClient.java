@@ -1,5 +1,7 @@
 package pt.raidline.api.fuzzy.client;
 
+import pt.raidline.api.fuzzy.TestController;
+import pt.raidline.api.fuzzy.client.model.RunContext;
 import pt.raidline.api.fuzzy.logging.CLILogger;
 import pt.raidline.api.fuzzy.model.AppArguments;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
@@ -9,7 +11,6 @@ import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.time.Duration;
@@ -18,11 +19,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 
-import static java.util.concurrent.StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 import static pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat.fromString;
@@ -31,24 +29,20 @@ public class FuzzyClient {
 
     private static final int NUMBER_OF_CYCLES = Integer.MAX_VALUE;
 
-    private final RequestManager manager;
-    private final Function<StructuredTaskScope.Configuration, StructuredTaskScope.Configuration> config;
+    private final RequestExecutor manager;
+    private final TestController controller;
+    private final AtomicInteger run;
     private final Duration maxTime;
 
-    public FuzzyClient(AppArguments args) {
+    public FuzzyClient(AppArguments args, TestController controller) {
         this.maxTime = Duration.of(args.maxTime.value(), ChronoUnit.SECONDS);
-        Duration timeout = Duration.between(Instant.now(), Instant.now().plus(this.maxTime));
-        this.config = conf -> conf
-                .withThreadFactory(Thread.ofVirtual()
-                        .name("Outer-Loop-Tester-VT", 0)
-                        .factory())
-                .withTimeout(timeout);
-
-        this.manager = new RequestManager(
+        this.controller = controller;
+        this.run = new AtomicInteger(0);
+        this.manager = new RequestExecutor(
+                controller,
                 args.concurrentCallsGate.value(),
                 args.concurrentEndpointCalls.value(),
-                args.exponentialUserGrowth.value(),
-                args.endingCondition.value()
+                args.exponentialUserGrowth.value()
         );
     }
 
@@ -65,7 +59,14 @@ public class FuzzyClient {
 
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
 
-        while (pathsIterator.hasNext()) {
+        Instant now = Instant.now();
+        long startTime = System.nanoTime();
+
+        var timeout = Duration.between(now, now.plus(maxTime));
+
+        //TODO: timeout works! just need to add some logging to that
+        while (pathsIterator.hasNext() && !hasTimeoutBeenReached(startTime)) {
+
             var iterator = pathsIterator.next();
 
             internalAssertion("Client Preparation",
@@ -74,33 +75,29 @@ public class FuzzyClient {
 
             CLILogger.debug("Starting new round of requests");
 
-            try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(), config)) {
+            var context = new RunContext(run.incrementAndGet());
 
-                do {
-                    var path = iterator.next();
-                    scope.fork(() -> this.manager.submit(
-                            this.createIterator(path, arguments.server, schemaGraph))
-                    );
-                } while (iterator.hasNext());
+            while (iterator.hasNext() && hasTimeoutBeenReached(startTime)) {
+                if (!controller.shouldContinue()) break;
+                var path = iterator.next();
 
-                scope.join();
-
-            } catch (StructuredTaskScope.TimeoutException e) {
-                // 4. TIMEOUT REACHED!
-                // The scope automatically cancels all running threads here.
-                CLILogger.severe("Server shutdown: Max running time of %s exceeded.", maxTime);
-                System.exit(0);
-            } catch (Exception e) {
-                CLILogger.severe("Requests failed: [%s]-[%s]", e.toString(), e.getMessage());
-                System.exit(1);
+                RequestIterator calls = this.createIterator(path, arguments.server, schemaGraph);
+                if (!this.manager.submit(calls, context, timeout)) {
+                    return;
+                }
             }
         }
     }
 
-    private RequestManager.RequestIterator createIterator(Path path,
-                                                          AppArguments.Arg<String> server,
-                                                          Map<String, SchemaBuilderNode> schemaGraph) {
-        return new RequestManager.RequestIterator() {
+    private boolean hasTimeoutBeenReached(long startTime) {
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - startTime);
+        return elapsed.compareTo(maxTime) > 0;
+    }
+
+    private RequestIterator createIterator(Path path,
+                                           AppArguments.Arg<String> server,
+                                           Map<String, SchemaBuilderNode> schemaGraph) {
+        return new RequestIterator() {
             private final AtomicInteger current = new AtomicInteger(0);
 
             @Override
@@ -109,7 +106,7 @@ public class FuzzyClient {
             }
 
             @Override
-            public HttpRequest next(RequestManager.RunContext context) {
+            public HttpRequest next(RunContext context) {
                 if (current.get() >= path.operations().size()) {
                     throw new NoSuchElementException();
                 }
@@ -122,14 +119,14 @@ public class FuzzyClient {
                         context,
                         operation,
                         requestBuilder, path, schemaGraph);
-                context.setContext(RequestManager.ContextKey.REQUEST, request);
+                context.setContext(RunContext.ContextKey.REQUEST, request);
 
                 return request;
             }
         };
     }
 
-    private HttpRequest buildRequest(String basePath, RequestManager.RunContext context,
+    private HttpRequest buildRequest(String basePath, RunContext context,
                                      PathOperation operation, HttpRequest.Builder builder,
                                      Path path, Map<String, SchemaBuilderNode> graph) {
 
@@ -155,19 +152,19 @@ public class FuzzyClient {
     }
 
     private HttpRequest.Builder decideHttpMethod(HttpRequest.Builder builder,
-                                                 RequestManager.RunContext context,
+                                                 RunContext context,
                                                  PathOperation operation,
                                                  Map<String, SchemaBuilderNode> graph) {
         return switch (operation.op()) {
             case GET -> builder.GET();
             case POST -> {
                 String body = buildBody(graph, operation);
-                context.setContext(RequestManager.ContextKey.REQUEST, body);
+                context.setContext(RunContext.ContextKey.REQUEST, body);
                 yield builder.POST(BodyPublishers.ofString(body));
             }
             case PUT -> {
                 String body = buildBody(graph, operation);
-                context.setContext(RequestManager.ContextKey.REQUEST, body);
+                context.setContext(RunContext.ContextKey.REQUEST, body);
                 yield builder.PUT(BodyPublishers.ofString(body));
             }
             case DELETE -> builder.DELETE();
@@ -224,5 +221,12 @@ public class FuzzyClient {
                 () -> false);
 
         return null;
+    }
+
+    interface RequestIterator {
+
+        boolean hasNext();
+
+        HttpRequest next(RunContext context);
     }
 }

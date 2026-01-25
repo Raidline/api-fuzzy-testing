@@ -25,8 +25,8 @@ public final class ArgumentParser {
     //maybe not ArgParse here, but left it as it is now
     private static final Map<String, ArgParser> NON_MANDATORY_PARAMS = Map.of(
             "-t", new MaximunRunninTimeArgParser(),
-            "-e", new EndingConditionArgParser(),
             "-r", new ConcurrentGateArgParser(),
+            "-d", new DebugModeArgParser(),
             "-c", new ConcurrentEndpointCallsArgParser(),
             "-u", new UserExponentialGrowthArgParser()
     );
@@ -63,6 +63,9 @@ public final class ArgumentParser {
                                                                    String[] arg,
                                                                    AppArguments.AppArgumentsBuilder builder) {
         if (params.containsKey(arg[0])) {
+            if (arg.length == 1) {
+                return params.get(arg[0]).parse(builder, arg[0], null);
+            }
             return params.get(arg[0]).parse(builder, arg[0], arg[1]);
         }
         return builder;
@@ -198,53 +201,6 @@ public final class ArgumentParser {
         }
     }
 
-    private static class EndingConditionArgParser implements ArgParser {
-
-        private static final int[] POSSIBLE_HTTP_STATUS = new int[]{
-                412, 500, 501, 502, 503, 504, 505
-        };
-
-        @Override
-        public AppArguments.AppArgumentsBuilder parse(AppArguments.AppArgumentsBuilder builder, String argument,
-                                                      String value) {
-
-            try {
-                var valueAsInt = Integer.parseInt(value);
-
-                precondition("Ending Condition Parser",
-                        "Possible values : [%s]".formatted(printPossibleStatusAsStrings()),
-                        () -> containsValue(valueAsInt));
-
-                return builder.addEndingCondition(argument, valueAsInt);
-            } catch (Exception e) {
-                CLILogger.warn("You are passing a non valid value as a ending condition : [%s]", e.getMessage());
-                CLILogger.warn("Possible values : [%s]", printPossibleStatusAsStrings());
-                precondition(
-                        "Ending Condition Parser",
-                        "You are passing a non valid value as a ending condition : [%s]".formatted(value),
-                        () -> false
-                );
-            }
-
-            return null;
-        }
-
-        private static String printPossibleStatusAsStrings() {
-            return Arrays.stream(POSSIBLE_HTTP_STATUS)
-                    .mapToObj(String::valueOf)
-                    .collect(Collectors.joining(","));
-        }
-
-        private static boolean containsValue(int value) {
-            for (int possibleHttpStatus : POSSIBLE_HTTP_STATUS) {
-                if (value == possibleHttpStatus) {
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
     private static class ConcurrentGateArgParser implements ArgParser {
 
         @Override
@@ -317,6 +273,17 @@ public final class ArgumentParser {
             }
 
             return null;
+        }
+    }
+
+    private static class DebugModeArgParser implements ArgParser {
+        @Override
+        public AppArguments.AppArgumentsBuilder parse(AppArguments.AppArgumentsBuilder builder,
+                                                      String argument, String value) {
+
+            CLILogger.setDebugMode(false);
+
+            return builder;
         }
     }
 }

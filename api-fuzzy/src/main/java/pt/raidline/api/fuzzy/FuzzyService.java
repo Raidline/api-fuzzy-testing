@@ -11,8 +11,10 @@ import java.util.Objects;
 class FuzzyService {
     private final SchemaProcessor schemaProcessor;
     private final PathProcessor pathProcessor;
+    private final TestController controller;
 
-    FuzzyService() {
+    FuzzyService(TestController controller) {
+        this.controller = controller;
         this.pathProcessor = new PathProcessor();
         this.schemaProcessor = new SchemaProcessor();
     }
@@ -23,6 +25,6 @@ class FuzzyService {
 
         var schemaGraph = this.schemaProcessor.processSchemaNodeGraph(definition.components());
         var paths = this.pathProcessor.processPaths(definition.paths());
-        new FuzzyClient(args).executeRequest(schemaGraph, paths, args);
+        new FuzzyClient(args, controller).executeRequest(schemaGraph, paths, args);
     }
 }

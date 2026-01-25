@@ -41,15 +41,13 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 ### Execution Control
 
-- [ ] **Time-Limited Execution** – Define a maximum duration for the test run when no errors occur
-- [ ] **Custom Stop Conditions** – Configure specific HTTP status codes (e.g., 502, 500)
+- [x] **Time-Limited Execution** – Define a maximum duration for the test run when no errors occur
 - [x] **Run Until Failure** – Default mode that continuously tests until an error is encountered
 
 ### Load & Concurrency
 
-- [ ] **Custom Number of simultaneous Requests** – Define an upper limit for **all** outgoing requests. Default is 10.
+- [x] **Custom Number of simultaneous Requests** – Define an upper limit for **all** outgoing requests. Default is 10.
 - [x] **Concurrent API Requests** – Support for sending multiple simultaneous requests to the API
-- [ ] **Concurrent Requests** – Support for sending multiple simultaneous requests to the same endpoint
 - [ ] **Exponential User Growth** – Define an upper of virtual users
 
 ### Reporting & Debugging
