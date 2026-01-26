@@ -100,6 +100,7 @@ public class RequestExecutor {
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            this.onFailure(e, context);
         } catch (StructuredTaskScope.TimeoutException e) {
             CLILogger.severe("Server shutdown: Max running time of %s exceeded.", timeout.getSeconds());
         } catch (Exception e) {
