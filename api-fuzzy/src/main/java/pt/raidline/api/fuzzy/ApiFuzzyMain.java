@@ -1,18 +1,16 @@
 package pt.raidline.api.fuzzy;
 
 import pt.raidline.api.fuzzy.parser.args.ArgumentParser;
-import pt.raidline.api.fuzzy.parser.file.OpenAPIParser;
+import pt.raidline.api.fuzzy.parser.file.ParserFactory;
 
 public class ApiFuzzyMain {
 
     public static void main(String[] args) {
         var arguments = ArgumentParser.parseArguments(args);
-        var def = new OpenAPIParser().parse(arguments.file.value());
+        var def = ParserFactory.decideParser(arguments.file.value()).parse();
 
         var controller = new TestController(arguments.maxTime);
         controller.init();
         new FuzzyService(controller).process(def, arguments);
-
-        //CLILogger.debug("API Definition : %s", def.toString());
     }
 }
