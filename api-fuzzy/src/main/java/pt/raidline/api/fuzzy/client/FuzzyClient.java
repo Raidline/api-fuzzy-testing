@@ -115,7 +115,7 @@ public class FuzzyClient {
                 var request = buildRequest(server.value(),
                         context,
                         operation,
-                        requestBuilder, path, schemaGraph);
+                        requestBuilder, path, schemaGraph).build();
                 context.setContext(RunContext.ContextKey.REQUEST, request);
 
                 return request;
@@ -123,9 +123,9 @@ public class FuzzyClient {
         };
     }
 
-    private HttpRequest buildRequest(String basePath, RunContext context,
-                                     PathOperation operation, HttpRequest.Builder builder,
-                                     Path path, Map<String, SchemaBuilderNode> graph) {
+    private HttpRequest.Builder buildRequest(String basePath, RunContext context,
+                                             PathOperation operation, HttpRequest.Builder builder,
+                                             Path path, Map<String, SchemaBuilderNode> graph) {
 
 
         var uri = new StringBuilder(basePath)
@@ -137,8 +137,7 @@ public class FuzzyClient {
 
         var headerBuilder = buildHeaders(uriBuilder, operation);
 
-        return decideHttpMethod(headerBuilder, context, operation, graph)
-                .build();
+        return decideHttpMethod(headerBuilder, context, operation, graph);
     }
 
     private void createQueries(Map<Path.ParameterLocation, List<Path.PathParameter>> params,
@@ -208,7 +207,7 @@ public class FuzzyClient {
 
     private static String buildBody(Map<String, SchemaBuilderNode> graph, PathOperation operation) {
         return graph.get(
-                ComponentBuilder.trimSchemaKeyFromRef(operation.request().ref())).buildSchema(); //todo: me no like this dependency
+                ComponentBuilder.trimSchemaKeyFromRef(operation.request().ref())).buildSchema();
     }
 
     private static String resolvePathParams(PathOperation postOp, String path) {

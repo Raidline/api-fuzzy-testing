@@ -1,7 +1,5 @@
 package pt.raidline.api.fuzzy.client.model;
 
-import pt.raidline.api.fuzzy.client.FuzzyClient;
-
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Objects;
@@ -9,8 +7,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-//todo: this could contain all the requests / responses contexts.
-//todo: after X elements we flush to a .txt to make room for new ones
 public class RunContext {
     private static final String RESPONSE_KEY = "response";
     private static final String REQUEST_KEY = "request";
