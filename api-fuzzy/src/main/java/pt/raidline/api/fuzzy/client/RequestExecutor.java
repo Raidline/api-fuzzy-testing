@@ -53,18 +53,12 @@ public class RequestExecutor {
             conf -> conf.withThreadFactory(threadFactory);
 
     private final TestController controller;
-    //todo: apply this values below
     private final Semaphore callsThrottled;
-    private final int concurrentEndpointCalls;
-    private final int exponentialUserGrowth;
     private final AtomicInteger innerRun;
 
-    RequestExecutor(TestController controller, int concurrentCallsGate,
-                    Integer concurrentEndpointCalls, Integer exponentialUserGrowth) {
+    RequestExecutor(TestController controller, int concurrentCallsGate) {
         this.controller = controller;
         this.callsThrottled = new Semaphore(concurrentCallsGate);
-        this.concurrentEndpointCalls = concurrentEndpointCalls;
-        this.exponentialUserGrowth = exponentialUserGrowth;
         this.innerRun = new AtomicInteger(0);
     }
 
@@ -78,7 +72,7 @@ public class RequestExecutor {
         try (var scope = StructuredTaskScope.open(awaitAllSuccessfulOrThrow(),
                 config.andThen(c -> c.withTimeout(timeout)))) {
             do {
-                if (!controller.shouldContinue()) break;
+                if (controller.shouldStop() || controller.timeoutReached) break;
 
                 var request = calls.next(context);
 
@@ -86,6 +80,7 @@ public class RequestExecutor {
                 try {
                     callsThrottled.acquire();
                     scope.fork(() -> {
+                        if (controller.shouldStop() || controller.timeoutReached) return null;
                         CLILogger.debug("Sending request : [%s]", request);
                         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 

@@ -6,7 +6,6 @@ import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import pt.raidline.api.fuzzy.assertions.AssertionUtils;
 import pt.raidline.api.fuzzy.logging.CLILogger;
@@ -25,10 +24,8 @@ public final class ArgumentParser {
     //maybe not ArgParse here, but left it as it is now
     private static final Map<String, ArgParser> NON_MANDATORY_PARAMS = Map.of(
             "-t", new MaximunRunninTimeArgParser(),
-            "-r", new ConcurrentGateArgParser(),
-            "-d", new DebugModeArgParser(),
-            "-c", new ConcurrentEndpointCallsArgParser(),
-            "-u", new UserExponentialGrowthArgParser()
+            "-lc", new ConcurrentGateArgParser(),
+            "-d", new DebugModeArgParser()
     );
 
     private ArgumentParser() {
@@ -91,7 +88,6 @@ public final class ArgumentParser {
                 String argument,
                 String value
         ) {
-            CLILogger.debug("schema file : %s,%s", argument, value);
 
             var f = new File(value);
             precondition(
@@ -117,8 +113,6 @@ public final class ArgumentParser {
                 String argument,
                 String value
         ) {
-            CLILogger.debug("server location : %s,%s", argument, value);
-
             //https://www.example.com:8080/
             //http://localhost:8080
 
@@ -218,56 +212,6 @@ public final class ArgumentParser {
                 precondition(
                         "Concurrent Gate Parser",
                         "You are passing a non valid value as a concurrent gate : [%s]".formatted(value),
-                        () -> false
-                );
-            }
-
-            return null;
-        }
-    }
-
-    private static class ConcurrentEndpointCallsArgParser implements ArgParser {
-
-        @Override
-        public AppArguments.AppArgumentsBuilder parse(AppArguments.AppArgumentsBuilder builder, String argument, String value) {
-            try {
-                var valueAsInt = Integer.parseInt(value);
-
-                precondition("Concurrent Endpoint Calls Parser",
-                        "The value needs to be positive and higher than 0",
-                        () -> valueAsInt > 0);
-
-                return builder.addConcurrentEndpointCalls(argument, valueAsInt);
-            } catch (Exception e) {
-                CLILogger.warn("You are passing a non valid value as a concurrent endpoint calls : [%s]", e.getMessage());
-                precondition(
-                        "Concurrent Endpoint Calls Parser",
-                        "You are passing a non valid value as a concurrent endpoint calls : [%s]".formatted(value),
-                        () -> false
-                );
-            }
-
-            return null;
-        }
-    }
-
-    private static class UserExponentialGrowthArgParser implements ArgParser {
-
-        @Override
-        public AppArguments.AppArgumentsBuilder parse(AppArguments.AppArgumentsBuilder builder, String argument, String value) {
-            try {
-                var valueAsInt = Integer.parseInt(value);
-
-                precondition("User Exponential Growth Parser",
-                        "The value needs to be positive and higher than 0",
-                        () -> valueAsInt > 0);
-
-                return builder.addConcurrentEndpointCalls(argument, valueAsInt);
-            } catch (Exception e) {
-                CLILogger.warn("You are passing a non valid value as a user exponential growth : [%s]", e.getMessage());
-                precondition(
-                        "User Exponential Growth Parser",
-                        "You are passing a non valid value as a user exponential growth : [%s]".formatted(value),
                         () -> false
                 );
             }

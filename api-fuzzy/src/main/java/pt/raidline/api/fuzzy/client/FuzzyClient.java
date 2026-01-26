@@ -38,12 +38,7 @@ public class FuzzyClient {
         this.maxTime = Duration.of(args.maxTime.value(), ChronoUnit.SECONDS);
         this.controller = controller;
         this.run = new AtomicInteger(0);
-        this.manager = new RequestExecutor(
-                controller,
-                args.concurrentCallsGate.value(),
-                args.concurrentEndpointCalls.value(),
-                args.exponentialUserGrowth.value()
-        );
+        this.manager = new RequestExecutor(controller, args.concurrentCallsGate.value());
     }
 
     public void executeRequest(Map<String, SchemaBuilderNode> schemaGraph,
@@ -60,12 +55,14 @@ public class FuzzyClient {
         var pathsIterator = new PathSupplierIterator(paths, NUMBER_OF_CYCLES);
 
         Instant now = Instant.now();
-        long startTime = System.nanoTime();
 
         var timeout = Duration.between(now, now.plus(maxTime));
 
-        //TODO: timeout works! just need to add some logging to that
-        while (pathsIterator.hasNext() && !hasTimeoutBeenReached(startTime)) {
+        controller.startTimeoutCheck();
+
+        CLILogger.info("Starting making requests");
+        while (pathsIterator.hasNext()) {
+            if (controller.shouldStop() || controller.timeoutReached) break;
 
             var iterator = pathsIterator.next();
 
@@ -77,8 +74,8 @@ public class FuzzyClient {
 
             var context = new RunContext(run.incrementAndGet());
 
-            while (iterator.hasNext() && hasTimeoutBeenReached(startTime)) {
-                if (!controller.shouldContinue()) break;
+            while (iterator.hasNext()) {
+                if (controller.shouldStop() || controller.timeoutReached) break;
                 var path = iterator.next();
 
                 RequestIterator calls = this.createIterator(path, arguments.server, schemaGraph);
@@ -87,11 +84,6 @@ public class FuzzyClient {
                 }
             }
         }
-    }
-
-    private boolean hasTimeoutBeenReached(long startTime) {
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - startTime);
-        return elapsed.compareTo(maxTime) > 0;
     }
 
     private RequestIterator createIterator(Path path,

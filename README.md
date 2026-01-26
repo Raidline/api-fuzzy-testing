@@ -48,7 +48,6 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 - [x] **Custom Number of simultaneous Requests** – Define an upper limit for **all** outgoing requests. Default is 10.
 - [x] **Concurrent API Requests** – Support for sending multiple simultaneous requests to the API
-- [ ] **Exponential User Growth** – Define an upper of virtual users
 
 ### Reporting & Debugging
 
