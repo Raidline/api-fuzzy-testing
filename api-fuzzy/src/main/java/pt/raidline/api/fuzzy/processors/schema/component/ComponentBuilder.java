@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
+import static pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat.fromString;
 
 public final class ComponentBuilder {
 
@@ -129,6 +130,7 @@ public final class ComponentBuilder {
         public String buildBody(UnaryOperator<String> onRef) {
             StringBuilder value = new StringBuilder();
             appendProperty(key, value);
+
             value.append(buildValue(key, schema, onRef));
 
             return value.toString();
@@ -162,8 +164,10 @@ public final class ComponentBuilder {
 
     static Object buildValue(String key, Schema schema, UnaryOperator<String> onRef) {
         return switch (schema.type()) {
-            case INTEGER -> ValueRandomizer.randomizeIntValue();
-            case STRING -> ValueRandomizer.randomizeStringValue(StringFormat.fromString(schema.format()));
+            case INTEGER -> ValueRandomizer.randomizeIntValue(schema.minimum(), schema.maximum());
+            case STRING -> ValueRandomizer.randomizeStringValue(fromString(schema.format()),
+                    schema.enumValues(), schema.minLength(), schema.maxLength(),
+                    schema.pattern());
             case BOOLEAN -> ValueRandomizer.randomizeBoolValue();
             case ARRAY -> {
                 List<Object> values = new ArrayList<>();

@@ -19,10 +19,6 @@ public record Path(String key, List<PathOperation> operations) {
     }
 
     public record OperationExchange(String media, ApiDefinition.SchemaType type, String ref) {
-
-        public boolean isEmptyExchange() {
-            return this.media == null && type == null && ref == null;
-        }
     }
 
     public record PathParameter(String name, ApiDefinition.Schema schema) {

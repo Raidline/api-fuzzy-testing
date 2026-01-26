@@ -1,8 +1,11 @@
 package pt.raidline.api.fuzzy.processors.schema;
 
+import com.mifmif.common.regex.Generex;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
@@ -20,10 +23,16 @@ public final class ValueRandomizer {
             "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
     };
 
+    private static final String[] DOMAINS = {"gmail", "yahoo", "hotmail", "outlook", "example"};
+    private static final String[] TLDS = {".com", ".net", ".org", ".io", ".co"};
+
     private ValueRandomizer() {
     }
 
-    public static String randomizeStringValue(StringFormat format) {
+    public static String randomizeStringValue(StringFormat format,
+                                              List<String> enumValues,
+                                              Integer lowerBound,
+                                              Integer upperBound, String pattern) {
         var randomizer = random.get();
         return switch (format) {
             case DATE_TIME -> LocalDateTime.now()
@@ -33,12 +42,43 @@ public final class ValueRandomizer {
             case DATE -> Date.from(Instant.now())
                     .toString();
             case UUID -> UUID.randomUUID().toString();
-            case DEFAULT -> "\"" + randomString(randomizer) + "\"";
+            case EMAIL -> generateEmail();
+            case URI -> randomString(randomizer, enumValues,
+                    lowerBound, upperBound, pattern);
+            case DEFAULT -> "\"" + randomString(randomizer, enumValues,
+                    lowerBound, upperBound, pattern) + "\"";
         };
     }
 
-    private static String randomString(ThreadLocalRandom randomizer) {
-        var stringLen = randomizer.nextInt(0, 15);
+    private static String generateEmail() {
+        ThreadLocalRandom randomizer = random.get();
+        var username = randomString(randomizer,
+                null, 5, 10, null);
+
+        String domain = DOMAINS[randomizer.nextInt(DOMAINS.length)];
+
+        String tld = TLDS[randomizer.nextInt(TLDS.length)];
+
+        return username + "@" + domain + tld;
+    }
+
+    private static String randomString(ThreadLocalRandom randomizer,
+                                       List<String> enumValues,
+                                       Integer lowerBound,
+                                       Integer upperBound, String pattern) {
+
+        RndBounds bounds = getRndBounds(lowerBound, upperBound);
+
+        if (pattern != null) {
+            return new Generex(pattern).random(bounds.lower(), bounds.upper());
+        }
+
+        if (enumValues != null && !enumValues.isEmpty()) {
+            var rndIdx = randomizer.nextInt(0, enumValues.size());
+            return enumValues.get(rndIdx);
+        }
+
+        var stringLen = randomizer.nextInt(bounds.lower(), bounds.upper());
         var output = new StringBuilder();
         for (int i = 0; i < stringLen; i++) {
             var alphabetRndIdx = randomizer.nextInt(0, alphabet.length);
@@ -54,9 +94,10 @@ public final class ValueRandomizer {
         return output.toString();
     }
 
-    public static int randomizeIntValue() {
+    public static int randomizeIntValue(Integer lowerBound, Integer upperBound) {
+        var bounds = getRndBounds(lowerBound, upperBound);
         var randomizer = random.get();
-        return randomizer.nextInt();
+        return randomizer.nextInt(bounds.lower, bounds.upper);
     }
 
     public static boolean randomizeBoolValue() {
@@ -68,6 +109,8 @@ public final class ValueRandomizer {
         DATE_TIME("date-time"),
         DATE("date"),
         UUID("uuid"),
+        EMAIL("email"),
+        URI("uri"),
         DEFAULT("default");
 
         final String format;
@@ -84,8 +127,19 @@ public final class ValueRandomizer {
                 case "date-time" -> DATE_TIME;
                 case "date" -> DATE;
                 case "uuid" -> UUID;
+                case "email" -> EMAIL;
+                case "uri" -> URI;
                 default -> DEFAULT;
             };
         }
+    }
+
+    private static RndBounds getRndBounds(Integer lowerBound, Integer upperBound) {
+        int lower = lowerBound == null ? 0 : lowerBound;
+        int upper = upperBound == null ? 15 : upperBound;
+        return new RndBounds(lower, upper);
+    }
+
+    private record RndBounds(int lower, int upper) {
     }
 }

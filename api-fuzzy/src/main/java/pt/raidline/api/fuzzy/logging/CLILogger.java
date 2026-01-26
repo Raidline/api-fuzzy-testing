@@ -8,7 +8,7 @@ import java.util.logging.Logger;
 
 public final class CLILogger {
 
-    public static boolean DEBUG_MODE = true;
+    public static boolean DEBUG_MODE = false;
 
     private static final Logger LOGGER = Logger.getGlobal();
 

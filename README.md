@@ -17,7 +17,8 @@ Why Java? Because i wanted a project where i could learn/investigate the virtual
 Is the Java the best language for CLI? No. But i wanted to do this project and since i want to investigate
 virtualThreads in Java, you get CLI app in Java. BIG W!
 
-> **IMPORTANT:** Java HttpClient does not support PATCH HTTP method. I'm not going, for this Java version, to add specific
+> **IMPORTANT:** Java HttpClient does not support PATCH HTTP method. I'm not going, for this Java version, to add
+> specific
 > code to send PATCH requests.
 > So, no PATCH requests can be made
 
@@ -37,7 +38,6 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 - [x] **Swagger/OpenAPI JSON Support** – Parse and interpret API definitions from Swagger/OpenAPI JSON files
 - [x] **Test All Endpoints** – Automatically discover and test all endpoints defined in the schema (default behavior)
-- [ ] **Single Endpoint Testing** – Option to target and test a specific endpoint in isolation
 
 ### Execution Control
 
@@ -53,8 +53,6 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 - [x] **Detailed Failure Output** – Comprehensive logging of failed requests including the full request body, headers,
   and response details
-- [ ] **Failure Replay** – Ability to re-run a specific test case that caused a failure for debugging and verification
-  purposes
 
 ## Getting Started
 

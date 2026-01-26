@@ -225,7 +225,7 @@ public final class ArgumentParser {
         public AppArguments.AppArgumentsBuilder parse(AppArguments.AppArgumentsBuilder builder,
                                                       String argument, String value) {
 
-            CLILogger.setDebugMode(false);
+            CLILogger.setDebugMode(true);
 
             return builder;
         }

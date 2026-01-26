@@ -3,10 +3,12 @@ package pt.raidline.api.fuzzy.client;
 import pt.raidline.api.fuzzy.TestController;
 import pt.raidline.api.fuzzy.client.model.RunContext;
 import pt.raidline.api.fuzzy.logging.CLILogger;
+import pt.raidline.api.fuzzy.model.ApiDefinition;
 import pt.raidline.api.fuzzy.model.AppArguments;
 import pt.raidline.api.fuzzy.processors.paths.model.Path;
 import pt.raidline.api.fuzzy.processors.paths.model.Path.PathOperation;
 import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer;
+import pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat;
 import pt.raidline.api.fuzzy.processors.schema.component.ComponentBuilder;
 import pt.raidline.api.fuzzy.processors.schema.model.SchemaBuilderNode;
 
@@ -23,6 +25,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.internalAssertion;
 import static pt.raidline.api.fuzzy.assertions.AssertionUtils.precondition;
+import static pt.raidline.api.fuzzy.processors.paths.model.Path.ParameterLocation.HEADER;
+import static pt.raidline.api.fuzzy.processors.paths.model.Path.ParameterLocation.PATH;
+import static pt.raidline.api.fuzzy.processors.paths.model.Path.ParameterLocation.QUERY;
 import static pt.raidline.api.fuzzy.processors.schema.ValueRandomizer.StringFormat.fromString;
 
 public class FuzzyClient {
@@ -122,24 +127,62 @@ public class FuzzyClient {
                                      PathOperation operation, HttpRequest.Builder builder,
                                      Path path, Map<String, SchemaBuilderNode> graph) {
 
-        var uriBuilder = builder
-                .uri(URI.create(basePath + resolvePathParams(operation, path.key())));
+
+        var uri = new StringBuilder(basePath)
+                .append(resolvePathParams(operation, path.key()));
+
+        createQueries(operation.opParams(), uri);
+
+        var uriBuilder = builder.uri(URI.create(uri.toString()));
 
         var headerBuilder = buildHeaders(uriBuilder, operation);
 
-        return decideHttpMethod(headerBuilder, context, operation, graph).build();
+        return decideHttpMethod(headerBuilder, context, operation, graph)
+                .build();
+    }
+
+    private void createQueries(Map<Path.ParameterLocation, List<Path.PathParameter>> params,
+                               StringBuilder uriBuilder) {
+
+        if (!params.containsKey(QUERY)) {
+            return;
+        }
+
+        var queries = params.get(QUERY);
+
+        uriBuilder.append("?");
+
+        for (Path.PathParameter query : queries) {
+            var schema = query.schema();
+            uriBuilder.append(query.name())
+                    .append("=");
+            if (schema.type().isInteger()) {
+                uriBuilder.append(ValueRandomizer.randomizeIntValue(schema.minimum(), schema.maximum()));
+            } else {
+                uriBuilder.append(ValueRandomizer.randomizeStringValue(StringFormat.URI,
+                        schema.enumValues(), schema.minLength(),
+                        schema.maxLength(), schema.pattern()));
+            }
+            uriBuilder.append("&");
+        }
+
+        uriBuilder.deleteCharAt(uriBuilder.length() - 1); //delete last &
     }
 
     private HttpRequest.Builder buildHeaders(HttpRequest.Builder builder,
                                              PathOperation operation) {
-        if (!operation.opParams().containsKey(Path.ParameterLocation.HEADER)) {
+        if (!operation.opParams().containsKey(HEADER)) {
             return builder;
         }
 
-        operation.opParams().get(Path.ParameterLocation.HEADER)
-                .forEach(pathParam -> builder.header(pathParam.name(),
-                        ValueRandomizer.randomizeStringValue(ValueRandomizer.StringFormat.DEFAULT)));
-        // all headers are strings probably, we can assume that, just need to build a random string here
+        operation.opParams().get(HEADER)
+                .forEach(pathParam -> {
+                    ApiDefinition.Schema schema = pathParam.schema();
+                    builder.header(pathParam.name(),
+                            ValueRandomizer.randomizeStringValue(StringFormat.DEFAULT,
+                                    schema.enumValues(), schema.minLength(),
+                                    schema.maxLength(), schema.pattern()));
+                });
         return builder;
     }
 
@@ -187,23 +230,28 @@ public class FuzzyClient {
         return newPath.deleteCharAt(newPath.length() - 1).toString();
     }
 
-    //todo: we can improve this by making this into a map
     private static String transformParam(Map<Path.ParameterLocation, List<Path.PathParameter>> uriParams,
                                          String param) {
         precondition("Path Parameter transformation",
                 "Found an '{' and we have no params!",
-                () -> uriParams.containsKey(Path.ParameterLocation.PATH));
+                () -> uriParams.containsKey(PATH));
 
         var sanitizedParam = param.substring(1, param.length() - 1);
 
-        var pathParams = uriParams.get(Path.ParameterLocation.PATH);
+        var pathParams = uriParams.get(PATH);
 
         for (Path.PathParameter pathParam : pathParams) {
             if (pathParam.name().equalsIgnoreCase(sanitizedParam)) {
-                if (pathParam.schema().type().isInteger()) {
-                    return String.valueOf(ValueRandomizer.randomizeIntValue());
+                ApiDefinition.Schema schema = pathParam.schema();
+
+                if (schema.type().isInteger()) {
+                    return String.valueOf(ValueRandomizer.randomizeIntValue(schema.minimum(), schema.maximum()));
                 } else {
-                    return ValueRandomizer.randomizeStringValue(fromString(pathParam.schema().format()));
+                    return ValueRandomizer.randomizeStringValue(
+                            fromString(schema.format()),
+                            schema.enumValues(),
+                            schema.minLength(), schema.maxLength(),
+                            schema.pattern());
                 }
             }
         }

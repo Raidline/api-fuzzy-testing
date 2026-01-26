@@ -81,7 +81,7 @@ public class RequestExecutor {
                     callsThrottled.acquire();
                     scope.fork(() -> {
                         if (controller.shouldStop() || controller.timeoutReached) return null;
-                        CLILogger.debug("Sending request : [%s]", request);
+                        CLILogger.info("Sending request : [%s]", request);
                         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
                         context.setContext(RunContext.ContextKey.RESPONSE, response);
