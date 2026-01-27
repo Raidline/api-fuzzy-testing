@@ -56,13 +56,120 @@ virtualThreads in Java, you get CLI app in Java. BIG W!
 
 ## Getting Started
 
-*Coming soon in the theaters*
+### Prerequisites
+
+- **Java 25** (with preview features enabled) – Required due to virtual threads and `StructuredTaskScope` usage
+- **Maven 3.6+** – For building and running the project
+
+### Building the Project
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd api-fuzzy-testing
+   ```
+
+2. Build the entire project:
+   ```bash
+   mvn clean compile
+   ```
+
+3. (Optional) Start the included test server:
+   ```bash
+   cd petstore-server
+   mvn exec:java
+   ```
 
 ## Configuration
 
-*Coming soon in the theaters*
+The tool accepts the following command-line arguments:
+
+| Argument | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `-f=<filepath>` | Path to the OpenAPI/Swagger JSON or YAML schema file | Yes | - |
+| `-s=<server>` | Target server URL (e.g., `http://localhost:8080`) | Yes | - |
+| `-t=<seconds>` | Maximum running time in seconds | No | Runs until failure |
+| `-lc=<number>` | Maximum number of concurrent requests (throttling) | No | 10 |
+| `-d` | Enable debug mode for verbose logging | No | Disabled |
+
+### Schema Files
+
+The tool supports:
+- **JSON** format OpenAPI/Swagger specifications
+- **YAML** format OpenAPI/Swagger specifications
+
+Example schema files are available in `api-fuzzy/src/main/resources/examples/`.
 
 ## Usage
 
-*Coming soon in the theaters*
+### Using the Run Script
+
+The easiest way to run the tool is using the provided shell script:
+
+```bash
+cd api-fuzzy
+./run.sh -f=src/main/resources/examples/petstore-example.json -s=http://localhost:8080
+```
+
+### Manual Execution
+
+Alternatively, run the tool manually using Maven:
+
+```bash
+cd api-fuzzy
+mvn clean compile
+java -cp "target/classes:target/dependency/*" pt.raidline.api.fuzzy.ApiFuzzyMain -f=<schema-file> -s=<server-url>
+```
+
+### Examples
+
+**Basic usage:**
+```bash
+./run.sh -f=api.json -s=http://localhost:8080
+```
+
+**With time limit (60 seconds):**
+```bash
+./run.sh -f=api.json -s=http://localhost:8080 -t=60
+```
+
+**With increased concurrency (20 simultaneous requests):**
+```bash
+./run.sh -f=api.json -s=http://localhost:8080 -lc=20
+```
+
+**With debug mode:**
+```bash
+./run.sh -f=api.json -s=http://localhost:8080 -d
+```
+
+**Complete example with all options:**
+```bash
+./run.sh -f=src/main/resources/examples/petstore-example.json -s=http://localhost:8080 -t=120 -lc=15 -d
+```
+
+### Testing with the Petstore Server
+
+The project includes a sample Petstore server for testing:
+
+1. Start the Petstore server:
+   ```bash
+   cd petstore-server
+   mvn exec:java
+   ```
+
+2. In another terminal, run the fuzzy tester:
+   ```bash
+   cd api-fuzzy
+   ./run.sh -f=src/main/resources/examples/petstore-example.json -s=http://localhost:8080
+   ```
+
+## Output
+
+The tool provides detailed output including:
+- **Request details** – Full HTTP request information (URI, method, headers, body)
+- **Response details** – Status code and response body
+- **Failure information** – Comprehensive error reports when a request fails
+
+When running with `-d` (debug mode), additional verbose logging is displayed showing the internal processing steps.
 
